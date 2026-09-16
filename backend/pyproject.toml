@@ -1,0 +1,37 @@
+[project]
+name = "ai-personal-intelligence"
+version = "0.1.0"
+description = "AI Personal Intelligence Center — email ingestion, analysis and Telegram alerts."
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["app", "tests"]
+
+[tool.ruff.lint]
+# E/F: pyflakes+pycodestyle, I: isort, B: bugbear, UP: pyupgrade,
+# S: bandit-style security, ASYNC: async pitfalls
+select = ["E", "F", "I", "B", "UP", "S", "ASYNC"]
+ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+# Assertions and fixtures are expected in tests.
+"tests/*" = ["S101"]
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_unused_configs = true
+disallow_untyped_defs = true
+warn_return_any = true
+no_implicit_optional = true
+strict_equality = true
+files = ["app"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

@@ -1,0 +1,73 @@
+# AI Personal Intelligence Center — service topology.
+# Networks are segmented: MySQL lives on an internal-only network and is never
+# published to the host. See docs/operations.md §2.
+
+services:
+  backend:
+    build:
+      context: ./backend
+    env_file: .env
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "${API_PORT:-8000}:8000"
+    networks:
+      - frontnet
+      - backnet
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.4
+    env_file: .env
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - backnet
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    # No host port mapping: reachable only on the internal backnet.
+
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - backnet
+    restart: unless-stopped
+    # Local LLM (ADR-016). Pull a model with:
+    #   docker compose exec ollama ollama pull llama3.1
+
+  n8n:
+    image: n8nio/n8n:latest
+    env_file: .env
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n-data:/home/node/.n8n
+    networks:
+      - frontnet
+      - backnet
+    restart: unless-stopped
+
+networks:
+  frontnet:
+    driver: bridge
+  backnet:
+    driver: bridge
+    internal: true
+
+volumes:
+  mysql-data:
+  ollama-data:
+  n8n-data:
