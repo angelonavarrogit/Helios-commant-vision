@@ -1,4 +1,5 @@
-"""Application services / use-case orchestration.
+"""Application services / use-case orchestration."""
 
-Populated from Phase 5 (email pipeline) onward.
-"""
+from app.services.pipeline import EmailPipeline, PipelineResult
+
+__all__ = ["EmailPipeline", "PipelineResult"]

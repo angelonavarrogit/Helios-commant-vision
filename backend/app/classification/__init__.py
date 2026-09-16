@@ -1,4 +1,25 @@
-"""Hybrid classification engine (rules first, LLM fallback).
+"""HELIOS BRAIN — Hybrid classification engine (rules first, LLM fallback).
 
-Populated from Phase 6 (see PROP-001 / ADR-004 in docs/decisions.md).
+Phase 5 ships the rule-based classifier and the engine seam; the LLM classifier
+is wired in Phase 6 (ADR-004). See docs/agents.md §1.
 """
+
+from app.classification.base import (
+    Category,
+    Classification,
+    ClassificationMethod,
+    Priority,
+    RiskLevel,
+)
+from app.classification.engine import ClassificationEngine
+from app.classification.rules import RuleClassifier
+
+__all__ = [
+    "Category",
+    "Classification",
+    "ClassificationEngine",
+    "ClassificationMethod",
+    "Priority",
+    "RiskLevel",
+    "RuleClassifier",
+]

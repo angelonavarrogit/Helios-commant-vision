@@ -5,5 +5,13 @@ directives in .kiro/steering/security.md.
 """
 
 from app.security.encryption import EncryptionError, decrypt, encrypt, generate_key
+from app.security.sanitization import detect_injection, sanitize
 
-__all__ = ["EncryptionError", "decrypt", "encrypt", "generate_key"]
+__all__ = [
+    "EncryptionError",
+    "decrypt",
+    "detect_injection",
+    "encrypt",
+    "generate_key",
+    "sanitize",
+]

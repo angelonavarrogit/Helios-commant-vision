@@ -6,5 +6,6 @@ later phases as the pipeline needs them.
 """
 
 from app.database.repositories.base import BaseRepository
+from app.database.repositories.email_repository import EmailRepository
 
-__all__ = ["BaseRepository"]
+__all__ = ["BaseRepository", "EmailRepository"]
