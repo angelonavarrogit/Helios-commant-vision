@@ -231,3 +231,40 @@ implementar. **No se implementan hasta tu confirmación.**
   SDK síncrono se ejecuta en hilos (`asyncio.to_thread`) para no bloquear el loop.
   El client-secret JSON vive en `secrets/` (git-ignored), nunca en el repo.
 - **Consecuencias**: mínimo privilegio real sobre el correo; sin secretos en git.
+
+## ADR-024 — HELIOS COMMAND como fase (Fase 5.7, tras la Fase 6)
+- **Estado**: accepted
+- **Contexto**: el usuario quiere conectar cuentas desde una UI, sin editar `.env`.
+- **Decisión**: HELIOS COMMAND (frontend + Connection Manager) se implementa como
+  **Fase 5.7, después de la Fase 6** (que el cerebro funcione primero end-to-end).
+  El frontend consume solo APIs del backend. Diseño en `docs/helios-command.md`.
+- **Consecuencias**: la inteligencia madura antes de exponer la conexión real de
+  cuentas; se evita desviar el foco a una vertical grande demasiado pronto.
+
+## ADR-025 — Autenticación mínima real de HELIOS (prerrequisito de Connections)
+- **Estado**: accepted
+- **Contexto**: exponer OAuth de cuentas sin identificar al usuario HELIOS crea
+  riesgo de IDOR (acceder/asociar cuentas ajenas).
+- **Decisión**: introducir autenticación de HELIOS (sesión + usuario propietario,
+  o JWT local) **antes** de los endpoints de conexión. Separar siempre identidad
+  interna HELIOS de identidad del proveedor externo.
+- **Consecuencias**: todos los endpoints de conexión filtran por `user_id`; sin
+  auth no hay connections.
+
+## ADR-026 — Frontend aislado (React + TypeScript + Vite + Tailwind)
+- **Estado**: accepted
+- **Decisión**: el frontend vive en un paquete `frontend/` separado, con su propio
+  Dockerfile, servido detrás del backend/reverse-proxy. No se acopla al backend
+  Python. Empieza como "minimal shell" (Dashboard + Connections).
+- **Consecuencias**: la toolchain de Node queda aislada; el backend sigue siendo
+  Python puro y desplegable por sí mismo.
+
+## ADR-027 — Migración estructural de `email_accounts` (para el ciclo de vida de conexión)
+- **Estado**: accepted (enfoque; SQL exacto se revisa al implementar la Fase 5.7)
+- **Decisión**: añadir `external_account_id`, `status` normalizado
+  (CONNECTED/CONNECTING/EXPIRED/ERROR/DISCONNECTED/REVOKED/REAUTH_REQUIRED),
+  `last_sync_at`, `last_error`, `connected_at`, `token_expires_at`; cambiar la
+  unicidad a `(user_id, provider, external_account_id)`. Migración Alembic
+  reversible cuando se implemente la fase.
+- **Consecuencias**: soporte real de multi-cuenta/multi-usuario y estados de
+  conexión; requiere migración de datos.

@@ -15,15 +15,20 @@ Visión completa e identidad de módulos en [`docs/vision.md`](docs/vision.md).
 
 ## Estado
 
-En construcción por fases. Fase actual: **Fase 1 — Bootstrap**.
+En construcción por fases. Fase actual: **Fase 6 — Classification Engine**.
 
 | Fase | Contenido | Estado |
 |------|-----------|--------|
 | 0 | Discovery & Architecture (docs) | Completada |
-| 1 | Bootstrap (FastAPI, MySQL, Docker, health) | En curso |
-| 2 | Database (SQLAlchemy + Alembic) | Pendiente |
-| 3 | Telegram bot | Pendiente |
-| 4+ | Email, clasificación, agentes, supervisor... | Pendiente |
+| 1 | Bootstrap (FastAPI, MySQL, Docker, health) | Completada |
+| 2 | Database (SQLAlchemy + Alembic) | Completada |
+| 3 | Telegram bot (/start, /help, allow-list) | Completada |
+| 4 | Email Provider (EmailProvider, Gmail read-only, registry) | Completada |
+| 5 | Email Pipeline (fetch→parse→normalize→store→classify) | Completada |
+| 6 | Classification Engine (híbrido reglas + LLM Ollama) | En curso |
+| 7-11 | Agentes (Finance/Insurance/Work/Security) + Supervisor | Pendiente |
+| 5.7 | HELIOS COMMAND (frontend + connections) tras Fase 6 | Diseñada ([docs](docs/helios-command.md)) |
+| 12-17 | Telegram intelligence, reports, documents, memory, hardening | Pendiente |
 
 ## Arquitectura (resumen)
 
