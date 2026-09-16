@@ -9,6 +9,11 @@ cryptography==44.0.0
 alembic==1.14.0
 python-telegram-bot==22.8
 
+# Google / Gmail (email provider — Phase 4). Read-only OAuth.
+google-api-python-client==2.156.0
+google-auth==2.37.0
+google-auth-oauthlib==1.2.1
+
 # Dev / test / quality
 pytest==8.3.4
 pytest-asyncio==0.25.2

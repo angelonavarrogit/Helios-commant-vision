@@ -211,3 +211,23 @@ implementar. **No se implementan hasta tu confirmación.**
 - **Ventajas**: rendimiento y TTL naturales. **Desventajas**: un servicio más que
   operar y asegurar. **Impacto**: medio (docker-compose + config).
 - **Decisión**: NO adoptar todavía; evitar sobre-ingeniería. Reabrir en Fase 5/6.
+
+## ADR-022 — Email provider abstraction + registry (multi-provider)
+- **Estado**: accepted
+- **Contexto**: HELIOS debe ingerir de varias cuentas y varios tipos de proveedor
+  (Gmail ahora; Outlook/IMAP/otros después) sin acoplar el pipeline.
+- **Decisión**: interfaz `EmailProvider` (Protocol, solo lectura) con objetos de
+  datos neutrales (`RawEmail`/`ProviderMessageRef`/`RawAttachment`) y un
+  `ProviderRegistry` de factorías por nombre. Los proveedores se auto-registran
+  al importarse. Guía completa en `docs/email-providers.md`.
+- **Consecuencias**: añadir un proveedor no cambia el pipeline; credenciales por
+  cuenta (no globales); errores uniformes vía `EmailProviderError`.
+
+## ADR-023 — Gmail read-only + refresh token cifrado
+- **Estado**: accepted
+- **Decisión**: `GmailProvider` usa exclusivamente el scope `gmail.readonly`;
+  la identidad OAuth (client_id/secret) viene del entorno y el refresh token por
+  cuenta se guarda cifrado (Fernet, ADR-010) y solo se descifra en memoria. El
+  SDK síncrono se ejecuta en hilos (`asyncio.to_thread`) para no bloquear el loop.
+  El client-secret JSON vive en `secrets/` (git-ignored), nunca en el repo.
+- **Consecuencias**: mínimo privilegio real sobre el correo; sin secretos en git.
