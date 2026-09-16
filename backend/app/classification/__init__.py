@@ -12,6 +12,7 @@ from app.classification.base import (
     RiskLevel,
 )
 from app.classification.engine import ClassificationEngine
+from app.classification.llm_classifier import LLMClassifier
 from app.classification.rules import RuleClassifier
 
 __all__ = [
@@ -19,6 +20,7 @@ __all__ = [
     "Classification",
     "ClassificationEngine",
     "ClassificationMethod",
+    "LLMClassifier",
     "Priority",
     "RiskLevel",
     "RuleClassifier",

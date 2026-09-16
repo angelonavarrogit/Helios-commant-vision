@@ -123,8 +123,8 @@ class EmailPipeline:
             },
         )
 
-        # --- Classify (rules now; +LLM in Phase 6) --------------------------
-        classification = self._engine.classify(normalized)
+        # --- Classify (hybrid: rules first, LLM when unsure) ----------------
+        classification = await self._engine.classify(normalized)
         self._repo.save_classification(email_row.id, classification)
         self._repo.mark_processed(email_row)
         self._audit(

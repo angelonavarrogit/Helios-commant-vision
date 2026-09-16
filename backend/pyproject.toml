@@ -38,7 +38,7 @@ files = ["app"]
 # Third-party Google client libraries ship no type stubs; ignore only their
 # missing imports rather than relaxing type checking globally.
 [[tool.mypy.overrides]]
-module = ["googleapiclient.*", "google.*", "google_auth_oauthlib.*"]
+module = ["googleapiclient.*", "google.*", "google_auth_oauthlib.*", "openai.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

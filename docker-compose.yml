@@ -43,7 +43,10 @@ services:
     volumes:
       - ollama-data:/root/.ollama
     networks:
+      # backnet: reachable by the backend (internal).
+      # frontnet: outbound internet access to pull models.
       - backnet
+      - frontnet
     restart: unless-stopped
     # Local LLM (ADR-016). Pull a model with:
     #   docker compose exec ollama ollama pull llama3.1
