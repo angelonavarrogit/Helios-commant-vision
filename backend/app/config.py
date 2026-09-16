@@ -25,7 +25,7 @@ class Settings(BaseSettings):
 
     # App
     app_env: Literal["local", "prod"] = "local"
-    app_name: str = "ai-personal-intelligence"
+    app_name: str = "helios"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     api_host: str = "0.0.0.0"  # noqa: S104 - binding inside container is intended
     api_port: int = 8000

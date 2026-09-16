@@ -1,9 +1,13 @@
-# AI Personal Intelligence Center
+# ☀️ HELIOS — Personal Intelligence & Awareness System
+
+> Observe → Understand → Classify → Prioritize → Alert → Remember
 
 Sistema personal de agentes de IA que ingiere correo electrónico vía APIs
 oficiales (OAuth de solo lectura), lo clasifica, lo analiza con agentes
 especializados, decide prioridad/riesgo/acción con un agente supervisor,
 persiste eventos importantes y notifica por Telegram.
+
+Visión completa e identidad de módulos en [`docs/vision.md`](docs/vision.md).
 
 > **v1 = READ + ANALYZE + NOTIFY.** El sistema no mueve dinero, no cambia
 > credenciales y no responde correos. Todo contenido de correo se trata como
@@ -106,6 +110,7 @@ mypy backend/app
 
 ## Documentación
 
+- [`docs/vision.md`](docs/vision.md)
 - [`docs/requirements.md`](docs/requirements.md)
 - [`docs/architecture.md`](docs/architecture.md)
 - [`docs/security.md`](docs/security.md)

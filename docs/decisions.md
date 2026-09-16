@@ -160,3 +160,54 @@ implementar. **No se implementan hasta tu confirmación.**
 - **Consecuencias**: máxima privacidad (nada de contenido sale del entorno);
   requiere hardware local para Ollama. La abstracción `LLMProvider` (ADR-003) se
   mantiene intacta.
+
+## ADR-017 — Rebranding a HELIOS
+- **Estado**: accepted
+- **Contexto**: el usuario aprobó adoptar "HELIOS — Personal Intelligence &
+  Awareness System" como nombre e identidad del proyecto.
+- **Decisión**: HELIOS es el nombre oficial (docs, README, `APP_NAME`). Se
+  introduce un "ubiquitous language" (HELIOS EYE/BRAIN/ORCHESTRATOR/SUPERVISOR/
+  BOT/WATCH/…) mapeado a las capas de código en `docs/vision.md`. **No** se
+  renombran paquetes de código para no romper imports sin beneficio.
+- **Consecuencias**: identidad coherente; el código sigue estable.
+
+## ADR-018 — `security_events` como tabla dedicada
+- **Estado**: accepted
+- **Contexto**: los eventos de seguridad (inicios de sesión, accesos, cambios de
+  contraseña, OTP, actividad sospechosa) merecen modelado propio, igual que
+  finance/insurance/work.
+- **Decisión**: añadir tabla `security_events` en la Fase 4/5 (cuando el pipeline
+  la consuma), con masking obligatorio y prohibición de persistir OTP/códigos.
+- **Consecuencias**: memoria de seguridad consultable; alineado con SecurityAgent.
+
+## ADR-019 — Comandos Telegram ampliados
+- **Estado**: accepted
+- **Decisión**: incluir `/seguridad` y `/documentos` además de los comandos ya
+  planificados. `/start` y `/help` se implementan en la Fase 3; el resto en F12.
+
+## ADR-020 — Human-in-the-loop lock para acciones futuras
+- **Estado**: accepted
+- **Contexto**: reforzar el candado de "no ejecutar acciones" más allá de v1.
+- **Decisión**: cualquier capacidad futura de ejecutar acciones (responder,
+  pagar, cambiar config) requiere un paso explícito de confirmación humana y su
+  propio ADR. No debe existir ninguna ruta de código que actúe sobre el mundo
+  sin ese gate. Registrado también en la steering `.kiro/steering/security.md`.
+- **Consecuencias**: invariante arquitectónica de seguridad verificable.
+
+## ADR-021 — Directivas de seguridad como steering permanente
+- **Estado**: accepted
+- **Decisión**: las directivas de seguridad/ingeniería viven en
+  `.kiro/steering/security.md` (always on), de modo que apliquen a todo cambio
+  del repositorio.
+- **Consecuencias**: la postura de seguridad no depende de recordarla en cada tarea.
+
+## PROP-005 — Redis para caché / rate-limiting / ventana de dedupe
+- **Estado**: proposed (diferido)
+- **Problema**: HELIOS sugiere Redis en el stack. Hoy no hay necesidad concreta:
+  la caché de clasificación se resuelve por `content_hash` en DB y el rate
+  limiting aún no existe.
+- **Alternativa**: introducir Redis cuando la Fase 5/6 muestre necesidad real
+  (throughput, ventanas de dedupe en memoria, rate limit distribuido).
+- **Ventajas**: rendimiento y TTL naturales. **Desventajas**: un servicio más que
+  operar y asegurar. **Impacto**: medio (docker-compose + config).
+- **Decisión**: NO adoptar todavía; evitar sobre-ingeniería. Reabrir en Fase 5/6.

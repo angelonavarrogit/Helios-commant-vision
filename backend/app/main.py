@@ -35,7 +35,7 @@ def create_app() -> FastAPI:
     """Application factory."""
     settings = get_settings()
     app = FastAPI(
-        title="AI Personal Intelligence Center",
+        title="HELIOS — Personal Intelligence & Awareness System",
         version=__version__,
         # Hide interactive docs in production (reduce surface area).
         docs_url=None if settings.is_prod else "/docs",
