@@ -6,10 +6,11 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Response, status
 from pydantic import BaseModel
 
 from app.config import Settings, get_settings
+from app.database import check_connection
 
 router = APIRouter(tags=["health"])
 
@@ -33,15 +34,21 @@ async def health() -> HealthResponse:
 
 
 @router.get("/ready", response_model=ReadyResponse)
-async def ready() -> ReadyResponse:
+async def ready(response: Response) -> ReadyResponse:
     """Readiness check.
 
-    In Phase 1 this reports basic configuration presence. Database and LLM
-    connectivity checks are added in later phases.
+    Reports configuration presence and database connectivity. Returns HTTP 503
+    when a critical dependency (the database) is unreachable so orchestrators
+    can gate traffic correctly.
     """
     settings: Settings = get_settings()
+    db_ok = check_connection()
     checks = {
         "config": "ok",
         "llm_provider": settings.llm_provider,
+        "database": "ok" if db_ok else "unavailable",
     }
-    return ReadyResponse(status="ok", checks=checks)
+    overall = "ok" if db_ok else "degraded"
+    if not db_ok:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    return ReadyResponse(status=overall, checks=checks)

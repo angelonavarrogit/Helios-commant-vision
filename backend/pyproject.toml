@@ -18,10 +18,13 @@ ignore = []
 [tool.ruff.lint.per-file-ignores]
 # Assertions and fixtures are expected in tests.
 "tests/*" = ["S101"]
+# Auto-generated Alembic migrations follow the tool's own style.
+"alembic/versions/*" = ["E501", "I001", "UP"]
 
 [tool.black]
 line-length = 100
 target-version = ["py312"]
+extend-exclude = "alembic/versions/"
 
 [tool.mypy]
 python_version = "3.12"
