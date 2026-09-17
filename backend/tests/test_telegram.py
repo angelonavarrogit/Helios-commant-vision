@@ -93,3 +93,31 @@ async def test_dispatch_authorized_unknown_command(monkeypatch) -> None:  # type
     monkeypatch.setattr(bot, "is_authorized", lambda _uid: True)
     text = await bot._dispatch("/bogus", user_id=123)
     assert "help" in text.lower()
+
+
+# --- Phase 12: intelligence command routing ----------------------------------
+
+from app.telegram.commands import (  # noqa: E402
+    is_intelligence_command,
+    query_method_for,
+)
+
+
+def test_intelligence_command_detection() -> None:
+    assert is_intelligence_command("/resumen") is True
+    assert is_intelligence_command("/urgentes@HeliosBot") is True
+    assert is_intelligence_command("/help") is False
+    assert is_intelligence_command("/nope") is False
+
+
+def test_query_method_mapping() -> None:
+    assert query_method_for("/finanzas") == "finance"
+    assert query_method_for("/seguridad") == "security"
+    assert query_method_for("/pendientes") == "pending"
+    assert query_method_for("/unknown") is None
+
+
+async def test_dispatch_unauthorized_blocks_intelligence() -> None:
+    # Even a valid intelligence command must be refused for non-allow-listed users.
+    text = await bot._dispatch("/resumen", user_id=999)
+    assert text == "Acceso no autorizado."

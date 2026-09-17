@@ -64,13 +64,40 @@ def unauthorized_reply() -> CommandReply:
     return CommandReply(text="Acceso no autorizado.")
 
 
+def _normalize(command: str) -> str:
+    """Lowercase the command word and strip an optional @botname suffix."""
+    token = command.strip().split()[0].lower() if command.strip() else ""
+    return token.split("@", 1)[0]
+
+
 def resolve_command(command: str) -> CommandReply | None:
-    """Resolve a command string (e.g. "/start") to a reply, or None if unknown."""
-    normalized = command.strip().split()[0].lower() if command.strip() else ""
-    # Strip an optional @botname suffix (Telegram group mentions).
-    normalized = normalized.split("@", 1)[0]
+    """Resolve a static command (/start, /help) to a reply, or None."""
+    normalized = _normalize(command)
     if normalized == "/start":
         return start_reply()
     if normalized == "/help":
         return help_reply()
     return None
+
+
+# Intelligence commands map to a QueryService method name. Kept as data so the
+# transport layer stays free of per-command branching.
+INTELLIGENCE_COMMANDS: dict[str, str] = {
+    "/resumen": "summary",
+    "/urgentes": "urgent",
+    "/finanzas": "finance",
+    "/seguros": "insurance",
+    "/trabajo": "work",
+    "/seguridad": "security",
+    "/pendientes": "pending",
+}
+
+
+def is_intelligence_command(command: str) -> bool:
+    """True if the command is one of the data-backed intelligence commands."""
+    return _normalize(command) in INTELLIGENCE_COMMANDS
+
+
+def query_method_for(command: str) -> str | None:
+    """Return the QueryService method name for an intelligence command, or None."""
+    return INTELLIGENCE_COMMANDS.get(_normalize(command))

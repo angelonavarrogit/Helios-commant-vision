@@ -39,6 +39,8 @@ from app.database.repositories.email_repository import EmailRepository
 from app.email.base import EmailProvider
 from app.email.normalizer import NormalizedEmail, normalize
 from app.observability import get_logger
+from app.services.notifications import NotificationService
+from app.telegram.notifications import Notifier
 
 logger = get_logger("app.services.pipeline")
 
@@ -69,6 +71,7 @@ class EmailPipeline:
         engine: ClassificationEngine | None = None,
         orchestrator: Orchestrator | None = None,
         supervisor: SupervisorAgent | None = None,
+        notifier: Notifier | None = None,
     ) -> None:
         self._session = session
         self._provider = provider
@@ -76,6 +79,11 @@ class EmailPipeline:
         self._engine = engine or ClassificationEngine()
         self._orchestrator = orchestrator or Orchestrator()
         self._supervisor = supervisor or SupervisorAgent()
+        # Notifications are optional: when no notifier is provided the pipeline
+        # still stores the decision but does not push an alert.
+        self._notifications = (
+            NotificationService(session, notifier) if notifier is not None else None
+        )
 
     async def process_message(self, account_id: int, provider_message_id: str) -> PipelineResult:
         """Run the full pipeline for one provider message id."""
@@ -154,6 +162,11 @@ class EmailPipeline:
         decision = self._supervisor.decide(classification, agent_results)
         self._repo.save_supervisor_decision(run.id, decision)
         self._repo.finish_agent_run(run)
+
+        # --- Notify (rules + dedupe) ----------------------------------------
+        if self._notifications is not None:
+            await self._notifications.maybe_notify(email_id=email_row.id, decision=decision)
+
         self._audit(
             request_id,
             email_row.id,

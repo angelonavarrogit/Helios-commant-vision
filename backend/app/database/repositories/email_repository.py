@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.agents.base import AgentResult as AgentResultDTO
@@ -25,6 +25,7 @@ from app.classification.base import Classification as ClassificationDTO
 from app.database.models import (
     AgentResult,
     AgentRun,
+    Alert,
     Classification,
     Email,
     SupervisorDecision,
@@ -151,3 +152,82 @@ class EmailRepository:
         run.finished_at = datetime.now(UTC)
         run.status = status
         self._session.flush()
+
+    # -- read queries (for the Telegram intelligence commands) ----------------
+
+    def recent_by_category(self, category: str, *, limit: int = 20) -> list[Classification]:
+        """Return recent classifications for a category (newest first)."""
+        stmt = (
+            select(Classification)
+            .where(Classification.category == category)
+            .order_by(Classification.id.desc())
+            .limit(limit)
+        )
+        return list(self._session.execute(stmt).scalars().all())
+
+    def urgent_classifications(self, *, limit: int = 20) -> list[Classification]:
+        """Return recent critical/high-priority classifications."""
+        stmt = (
+            select(Classification)
+            .where(Classification.priority.in_(("critical", "high")))
+            .order_by(Classification.id.desc())
+            .limit(limit)
+        )
+        return list(self._session.execute(stmt).scalars().all())
+
+    def action_required(self, *, limit: int = 20) -> list[Classification]:
+        """Return recent classifications that require action (pending items)."""
+        stmt = (
+            select(Classification)
+            .where(Classification.requires_action.is_(True))
+            .order_by(Classification.id.desc())
+            .limit(limit)
+        )
+        return list(self._session.execute(stmt).scalars().all())
+
+    def category_counts(self) -> dict[str, int]:
+        """Return a map of category -> count across all classifications."""
+        stmt = select(Classification.category, func.count()).group_by(Classification.category)
+        return {row[0]: row[1] for row in self._session.execute(stmt).all()}
+
+    def priority_counts(self) -> dict[str, int]:
+        """Return a map of priority -> count across all classifications."""
+        stmt = select(Classification.priority, func.count()).group_by(Classification.priority)
+        return {row[0]: row[1] for row in self._session.execute(stmt).all()}
+
+    def total_emails(self) -> int:
+        """Return the total number of stored emails."""
+        return self._session.execute(select(func.count()).select_from(Email)).scalar_one()
+
+    # -- alerts (dedup + persistence) -----------------------------------------
+
+    def alert_exists(self, dedupe_key: str) -> bool:
+        """True if an alert with this dedupe key was already recorded.
+
+        Used to avoid sending duplicate alerts for the same logical event.
+        """
+        stmt = select(Alert.id).where(Alert.dedupe_key == dedupe_key).limit(1)
+        return self._session.execute(stmt).first() is not None
+
+    def create_alert(
+        self,
+        *,
+        email_id: int | None,
+        priority: str,
+        dedupe_key: str,
+        group_id: str | None,
+        status: str,
+    ) -> Alert:
+        """Persist an alert record (sent or grouped/suppressed)."""
+        alert = Alert(
+            email_id=email_id,
+            channel="telegram",
+            priority=priority,
+            dedupe_key=dedupe_key,
+            group_id=group_id,
+            sent_at=datetime.now(UTC) if status == "sent" else None,
+            status=status,
+        )
+        self._session.add(alert)
+        self._session.flush()
+        return alert

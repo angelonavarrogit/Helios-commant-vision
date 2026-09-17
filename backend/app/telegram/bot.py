@@ -14,7 +14,12 @@ from typing import TYPE_CHECKING, Any
 from app.config import get_settings
 from app.observability import get_logger
 from app.telegram.authorization import is_authorized
-from app.telegram.commands import resolve_command, unauthorized_reply
+from app.telegram.commands import (
+    is_intelligence_command,
+    query_method_for,
+    resolve_command,
+    unauthorized_reply,
+)
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from telegram import Update
@@ -33,10 +38,41 @@ async def _dispatch(command: str, user_id: int | None) -> str:
     if not is_authorized(user_id):
         logger.warning("unauthorized_telegram_access", extra={"user_id": user_id})
         return unauthorized_reply().text
+
+    # Static commands first (/start, /help).
     reply = resolve_command(command)
-    if reply is None:
+    if reply is not None:
+        return reply.text
+
+    # Data-backed intelligence commands (/resumen, /urgentes, ...).
+    if is_intelligence_command(command):
+        return _run_intelligence(command)
+
+    return "Comando no reconocido. Usa /help."
+
+
+def _run_intelligence(command: str) -> str:
+    """Answer an intelligence command by querying the database.
+
+    Opens a short-lived DB session, delegates to QueryService, and returns the
+    text. Errors degrade to a neutral message (never leak internals).
+    """
+    method_name = query_method_for(command)
+    if method_name is None:
         return "Comando no reconocido. Usa /help."
-    return reply.text
+    try:
+        from app.database.session import get_sessionmaker
+        from app.services.queries import QueryService
+
+        session = get_sessionmaker()()
+        try:
+            service = QueryService(session)
+            return str(getattr(service, method_name)())
+        finally:
+            session.close()
+    except Exception as exc:  # noqa: BLE001 - never leak internals to the user
+        logger.warning("intelligence_query_failed", extra={"error": type(exc).__name__})
+        return "No pude consultar esa información ahora. Intenta más tarde."
 
 
 async def _handle_start(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -69,4 +105,13 @@ def build_application() -> Application[Any, Any, Any, Any, Any, Any]:
     application = Application.builder().token(token).build()
     application.add_handler(CommandHandler("start", _handle_start))
     application.add_handler(CommandHandler("help", _handle_help))
+    # Register the intelligence commands; each dispatches by its own name.
+    for cmd in ("resumen", "urgentes", "finanzas", "seguros", "trabajo", "seguridad", "pendientes"):
+        application.add_handler(CommandHandler(cmd, _handle_intelligence))
     return application
+
+
+async def _handle_intelligence(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
+    # The command text (e.g. "/finanzas") is in the message; reuse the dispatcher.
+    message_text = update.message.text if update.message and update.message.text else ""
+    await _reply_to_update(update, message_text)
