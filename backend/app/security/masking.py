@@ -37,3 +37,25 @@ def mask_numbers_in_text(text: str) -> str:
         return mask_number(match.group(0))
 
     return _LONG_NUMBER_RE.sub(_repl, text)
+
+
+# One-time passwords / auth codes are typically standalone 4-8 digit numbers.
+# We require a word boundary on both sides so we don't clobber parts of longer
+# numbers (which mask_numbers_in_text already handles) or embedded digits.
+_OTP_RE = re.compile(r"\b\d{4,8}\b")
+
+
+def redact_codes(text: str) -> str:
+    """Redact standalone 4-8 digit codes (OTP/2FA/verification) from text.
+
+    Security codes must never be shown in full (steering §5). This replaces them
+    with a fully-redacted marker rather than a last-4 mask, because even partial
+    OTP digits are sensitive. Longer numbers (PAN/account) are handled by
+    mask_numbers_in_text and are not the target here.
+    """
+    return _OTP_RE.sub("[REDACTED_CODE]", text)
+
+
+def contains_code(text: str) -> bool:
+    """True if the text appears to contain a standalone 4-8 digit code."""
+    return _OTP_RE.search(text) is not None
