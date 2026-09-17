@@ -113,3 +113,38 @@ async def test_pipeline_injection_is_stored_as_data_and_audited(
     actions = {a.action for a in audits}
     assert "email_stored" in actions
     assert "email_classified" in actions
+
+
+# --- Phase 11: supervisor integration ----------------------------------------
+
+
+async def test_pipeline_persists_supervisor_decision(
+    db_session: Session, account: EmailAccount
+) -> None:
+    from app.database.models import AgentResult as AgentResultRow
+    from app.database.models import AgentRun, SupervisorDecision
+
+    provider = FakeEmailProvider([_raw("sup", subject="Your payment receipt", body="Total $10.00")])
+    pipeline = EmailPipeline(db_session, provider)
+
+    result = await pipeline.process_message(account.id, "sup")
+
+    assert result.decision is not None
+    # An agent run, at least one agent result, and one decision were persisted.
+    assert _count(db_session, AgentRun) == 1
+    assert _count(db_session, AgentResultRow) >= 1
+    assert _count(db_session, SupervisorDecision) == 1
+
+    decision = db_session.execute(select(SupervisorDecision)).scalar_one()
+    assert decision.importance in {"informational", "low", "medium", "high", "critical"}
+
+
+async def test_pipeline_security_email_notifies(db_session: Session, account: EmailAccount) -> None:
+    # A security email classifies as high priority → supervisor notify_now.
+    provider = FakeEmailProvider(
+        [_raw("sec", subject="New sign-in detected", body="A new device signed in")]
+    )
+    pipeline = EmailPipeline(db_session, provider)
+    result = await pipeline.process_message(account.id, "sec")
+    assert result.decision is not None
+    assert result.decision.notify_now is True

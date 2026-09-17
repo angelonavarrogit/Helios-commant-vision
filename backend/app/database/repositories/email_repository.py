@@ -14,11 +14,21 @@ by checking before insert, backed by the unique constraint in the schema.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.agents.base import AgentResult as AgentResultDTO
+from app.agents.supervisor import SupervisorDecision as SupervisorDecisionDTO
 from app.classification.base import Classification as ClassificationDTO
-from app.database.models import Classification, Email
+from app.database.models import (
+    AgentResult,
+    AgentRun,
+    Classification,
+    Email,
+    SupervisorDecision,
+)
 from app.email.normalizer import NormalizedEmail
 
 
@@ -90,4 +100,54 @@ class EmailRepository:
     def mark_processed(self, email: Email) -> None:
         """Flag an email as fully processed by the pipeline."""
         email.is_processed = True
+        self._session.flush()
+
+    # -- agent run / results / supervisor decision ----------------------------
+
+    def create_agent_run(self, email_id: int, request_id: str) -> AgentRun:
+        """Open an agent run record for this email/request."""
+        run = AgentRun(
+            email_id=email_id,
+            request_id=request_id,
+            started_at=datetime.now(UTC),
+            status="running",
+        )
+        self._session.add(run)
+        self._session.flush()
+        return run
+
+    def save_agent_results(self, run_id: int, results: list[AgentResultDTO]) -> None:
+        """Persist each agent's result as JSON under the run."""
+        for result in results:
+            self._session.add(
+                AgentResult(
+                    agent_run_id=run_id,
+                    agent_name=result.agent_name,
+                    output_json=result.model_dump(mode="json"),
+                    confidence=result.confidence,
+                )
+            )
+        self._session.flush()
+
+    def save_supervisor_decision(
+        self, run_id: int, decision: SupervisorDecisionDTO
+    ) -> SupervisorDecision:
+        """Persist the supervisor's consolidated decision."""
+        row = SupervisorDecision(
+            agent_run_id=run_id,
+            importance=decision.importance,
+            notify_now=decision.notify_now,
+            summary=decision.summary,
+            reason=decision.reason,
+            recommended_action=decision.recommended_action,
+            confidence=decision.confidence,
+        )
+        self._session.add(row)
+        self._session.flush()
+        return row
+
+    def finish_agent_run(self, run: AgentRun, status: str = "completed") -> None:
+        """Close an agent run record."""
+        run.finished_at = datetime.now(UTC)
+        run.status = status
         self._session.flush()
