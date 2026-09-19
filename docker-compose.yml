@@ -63,6 +63,19 @@ services:
       - backnet
     restart: unless-stopped
 
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    networks:
+      - frontnet
+    restart: unless-stopped
+    # The frontend only needs to reach the backend from the user's browser, so
+    # it lives on frontnet and talks to the API via the public base URL.
+
 networks:
   frontnet:
     driver: bridge

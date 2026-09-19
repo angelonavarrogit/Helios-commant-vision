@@ -70,7 +70,21 @@ código ni en el repositorio.
 docker compose up -d --build
 ```
 
-Servicios: `backend` (API), `mysql`, `n8n`, `ollama`.
+Servicios: `backend` (API), `frontend` (HELIOS COMMAND UI, puerto 5173), `mysql`, `n8n`, `ollama`.
+
+## HELIOS COMMAND (frontend)
+
+Interfaz web para conectar cuentas (Gmail, etc.) sin editar `.env`. Requiere un
+usuario propietario configurado:
+
+```bash
+# Genera el hash de la contraseña del propietario y ponlo en .env (OWNER_PASSWORD_HASH)
+python backend/scripts/hash_password.py
+```
+
+Luego abre `http://localhost:5173`, inicia sesión y ve a Connections.
+Detalle en [`docs/frontend-architecture.md`](docs/frontend-architecture.md) y
+[`docs/helios-command.md`](docs/helios-command.md).
 
 ## Health check
 
