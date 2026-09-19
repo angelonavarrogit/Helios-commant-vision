@@ -80,6 +80,11 @@ docker compose up -d --build
 
 Servicios: `backend` (API), `frontend` (HELIOS COMMAND UI, puerto 5173), `mysql`, `n8n`, `ollama`.
 
+## Puesta en marcha real
+
+Guía paso a paso (qué hacer y qué credenciales necesitas) en
+[`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md).
+
 ## HELIOS COMMAND (frontend)
 
 Interfaz web para conectar cuentas (Gmail, etc.) sin editar `.env`. Requiere un
