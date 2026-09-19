@@ -16,7 +16,9 @@ from app.observability import get_logger
 from app.telegram.authorization import is_authorized
 from app.telegram.commands import (
     is_intelligence_command,
+    is_report_command,
     query_method_for,
+    report_method_for,
     resolve_command,
     unauthorized_reply,
 )
@@ -48,6 +50,10 @@ async def _dispatch(command: str, user_id: int | None) -> str:
     if is_intelligence_command(command):
         return _run_intelligence(command)
 
+    # Report commands (/hoy, /semana).
+    if is_report_command(command):
+        return _run_report(command)
+
     return "Comando no reconocido. Usa /help."
 
 
@@ -73,6 +79,26 @@ def _run_intelligence(command: str) -> str:
     except Exception as exc:  # noqa: BLE001 - never leak internals to the user
         logger.warning("intelligence_query_failed", extra={"error": type(exc).__name__})
         return "No pude consultar esa información ahora. Intenta más tarde."
+
+
+def _run_report(command: str) -> str:
+    """Answer a report command (/hoy, /semana) by querying the database."""
+    method_name = report_method_for(command)
+    if method_name is None:
+        return "Comando no reconocido. Usa /help."
+    try:
+        from app.database.session import get_sessionmaker
+        from app.services.reports import ReportService
+
+        session = get_sessionmaker()()
+        try:
+            service = ReportService(session)
+            return str(getattr(service, method_name)())
+        finally:
+            session.close()
+    except Exception as exc:  # noqa: BLE001 - never leak internals to the user
+        logger.warning("report_failed", extra={"error": type(exc).__name__})
+        return "No pude generar el informe ahora. Intenta más tarde."
 
 
 async def _handle_start(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -106,7 +132,16 @@ def build_application() -> Application[Any, Any, Any, Any, Any, Any]:
     application.add_handler(CommandHandler("start", _handle_start))
     application.add_handler(CommandHandler("help", _handle_help))
     # Register the intelligence commands; each dispatches by its own name.
-    for cmd in ("resumen", "urgentes", "finanzas", "seguros", "trabajo", "seguridad", "pendientes"):
+    intel_cmds = (
+        "resumen",
+        "urgentes",
+        "finanzas",
+        "seguros",
+        "trabajo",
+        "seguridad",
+        "pendientes",
+    )
+    for cmd in (*intel_cmds, "hoy", "semana"):
         application.add_handler(CommandHandler(cmd, _handle_intelligence))
     return application
 

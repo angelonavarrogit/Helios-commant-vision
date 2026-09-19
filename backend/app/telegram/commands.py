@@ -92,6 +92,22 @@ INTELLIGENCE_COMMANDS: dict[str, str] = {
     "/pendientes": "pending",
 }
 
+# Report commands map to a ReportService method name (Phase 13).
+REPORT_COMMANDS: dict[str, str] = {
+    "/hoy": "daily",
+    "/semana": "weekly",
+}
+
+
+def is_report_command(command: str) -> bool:
+    """True if the command is a daily/weekly report command."""
+    return _normalize(command) in REPORT_COMMANDS
+
+
+def report_method_for(command: str) -> str | None:
+    """Return the ReportService method name for a report command, or None."""
+    return REPORT_COMMANDS.get(_normalize(command))
+
 
 def is_intelligence_command(command: str) -> bool:
     """True if the command is one of the data-backed intelligence commands."""

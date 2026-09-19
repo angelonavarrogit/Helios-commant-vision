@@ -199,6 +199,20 @@ class EmailRepository:
         """Return the total number of stored emails."""
         return self._session.execute(select(func.count()).select_from(Email)).scalar_one()
 
+    def classifications_since(self, since: datetime) -> list[Classification]:
+        """Return classifications for emails created on/after ``since``.
+
+        Joins to Email.created_at so date filtering reflects when HELIOS
+        ingested the message (stable, unlike the email's own headers).
+        """
+        stmt = (
+            select(Classification)
+            .join(Email, Classification.email_id == Email.id)
+            .where(Email.created_at >= since)
+            .order_by(Classification.id.desc())
+        )
+        return list(self._session.execute(stmt).scalars().all())
+
     # -- alerts (dedup + persistence) -----------------------------------------
 
     def alert_exists(self, dedupe_key: str) -> bool:

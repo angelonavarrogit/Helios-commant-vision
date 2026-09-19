@@ -31,6 +31,7 @@ from app.email.registry import registry
 from app.observability import get_logger
 from app.security import decrypt
 from app.services.pipeline import EmailPipeline
+from app.services.reports import ReportService
 
 router = APIRouter(prefix="/api/v1/emails", tags=["emails"])
 logger = get_logger("app.api.emails")
@@ -96,3 +97,23 @@ async def process_email(
         importance=result.decision.importance if result.decision else None,
         notify_now=result.decision.notify_now if result.decision else False,
     )
+
+
+class ReportResponse(BaseModel):
+    period: str
+    text: str
+
+
+@router.get("/reports/{period}", response_model=ReportResponse)
+async def report(
+    period: str,
+    session: Annotated[Session, Depends(get_db)],
+    _auth: Annotated[None, Depends(require_service_token)],
+) -> ReportResponse:
+    """Return a daily or weekly report (service-token protected, for N8N)."""
+    service = ReportService(session)
+    if period == "daily":
+        return ReportResponse(period=period, text=service.daily())
+    if period == "weekly":
+        return ReportResponse(period=period, text=service.weekly())
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown report period")
