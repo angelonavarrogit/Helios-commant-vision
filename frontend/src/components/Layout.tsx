@@ -7,6 +7,7 @@ import { useAuth } from "../auth/AuthContext";
 const NAV = [
   { to: "/", label: "Dashboard", end: true },
   { to: "/connections", label: "Connections" },
+  { to: "/settings", label: "Settings" },
 ];
 
 export function Layout() {

@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
 from app.api import auth, connections, emails, health
+from app.api import settings as settings_api
 from app.config import get_settings
 from app.observability import configure_logging, get_logger
 
@@ -61,6 +62,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router)
     app.include_router(connections.router)
     app.include_router(emails.router)
+    app.include_router(settings_api.router)
     return app
 
 

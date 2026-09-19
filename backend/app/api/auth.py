@@ -15,9 +15,17 @@ from typing import Annotated
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.security.auth import create_session_token, verify_password, verify_session_token
+from app.database.session import get_db
+from app.security.auth import (
+    create_session_token,
+    hash_password,
+    verify_password,
+    verify_session_token,
+)
+from app.services.settings_service import SettingsService
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -50,17 +58,26 @@ def get_current_user(
 
 
 @router.post("/login", response_model=MeResponse)
-async def login(payload: LoginRequest, response: Response) -> MeResponse:
+async def login(
+    payload: LoginRequest,
+    response: Response,
+    session: Annotated[Session, Depends(get_db)],
+) -> MeResponse:
     """Authenticate the owner and set a signed session cookie.
+
+    The password hash is resolved with DB-over-env precedence, so a password
+    changed from the UI (stored in app_settings) takes effect immediately while
+    the `.env` value remains the initial bootstrap credential.
 
     Uses constant-time password verification and a neutral error so an attacker
     cannot distinguish "bad user" from "bad password".
     """
     settings = get_settings()
+    effective_hash = SettingsService(session).get_effective("owner_password_hash")
     valid = (
         payload.username == settings.owner_username
-        and bool(settings.owner_password_hash)
-        and verify_password(payload.password, settings.owner_password_hash)
+        and bool(effective_hash)
+        and verify_password(payload.password, effective_hash)
     )
     if not valid:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
@@ -88,3 +105,36 @@ async def logout(response: Response) -> dict[str, str]:
 async def me(username: Annotated[str, Depends(get_current_user)]) -> MeResponse:
     """Return the current authenticated user (or 401)."""
     return MeResponse(username=username)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@router.post("/change-password")
+async def change_password(
+    payload: ChangePasswordRequest,
+    _username: Annotated[str, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_db)],
+) -> dict[str, str]:
+    """Change the owner password (stored hashed in the DB, taking precedence).
+
+    Requires a valid session AND the current password, so a stolen session alone
+    cannot change the password. The new hash is stored in app_settings; the
+    `.env` value stays as the bootstrap fallback.
+    """
+    svc = SettingsService(session)
+    current_hash = svc.get_effective("owner_password_hash")
+    if not current_hash or not verify_password(payload.current_password, current_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Current password is incorrect"
+        )
+    if len(payload.new_password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be at least 8 characters",
+        )
+    svc.set_secret("owner_password_hash", hash_password(payload.new_password))
+    session.commit()
+    return {"status": "ok"}

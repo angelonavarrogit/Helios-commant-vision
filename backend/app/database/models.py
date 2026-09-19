@@ -291,6 +291,23 @@ class LLMRequest(Base, TimestampMixin):
     prompt_hash: Mapped[str | None] = mapped_column(String(64))
 
 
+class AppSetting(Base, TimestampMixin):
+    """Key/value store for runtime-configurable settings (Phase 5.8).
+
+    Secret values (tokens, API keys, password hash) are stored ENCRYPTED at rest
+    (Fernet); ``is_secret`` marks them so the API never returns their content.
+    DB values take precedence over `.env` for Class-B secrets (see docs).
+    """
+
+    __tablename__ = "app_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    key: Mapped[str] = mapped_column(String(64), unique=True)
+    # Fernet ciphertext for secrets; plain text for non-secret settings.
+    value: Mapped[str] = mapped_column(Text)
+    is_secret: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 

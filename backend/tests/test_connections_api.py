@@ -7,22 +7,53 @@ connection lifecycle itself is covered in test_connections.py against the DB.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 import pytest
 from app.config import get_settings
+from app.database.base import Base
+from app.database.session import get_db
 from app.security.auth import hash_password
+from app.security.encryption import generate_key
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import StaticPool
 
 
 @pytest.fixture
-def owner_client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
-    """A TestClient with a known owner configured."""
+def owner_client(monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
+    """A TestClient with a known owner and an in-memory DB.
+
+    Login now resolves the password hash with DB-over-env precedence, so the app
+    needs a working DB session even for auth. We override get_db with SQLite.
+    """
     monkeypatch.setenv("SESSION_SECRET", "test-secret")
+    monkeypatch.setenv("ENCRYPTION_KEY", generate_key())
     monkeypatch.setenv("OWNER_USERNAME", "owner")
     monkeypatch.setenv("OWNER_PASSWORD_HASH", hash_password("correct-horse"))
     get_settings.cache_clear()
+
+    engine = create_engine(
+        "sqlite+pysqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+
+    def override_get_db() -> Iterator[Session]:
+        session = factory()
+        try:
+            yield session
+        finally:
+            session.close()
+
     from app.main import create_app
 
-    with TestClient(create_app()) as client:
+    app = create_app()
+    app.dependency_overrides[get_db] = override_get_db
+    with TestClient(app) as client:
         yield client
     get_settings.cache_clear()
 

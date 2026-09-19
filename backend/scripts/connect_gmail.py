@@ -8,7 +8,8 @@ for the owner user.
 Usage (PowerShell), from the project root, values kept in your shell only:
     $env:HELIOS_GMAIL_REFRESH_TOKEN = "1//0g...."
     $env:HELIOS_GMAIL_EMAIL = "you@gmail.com"
-    docker compose exec -e HELIOS_GMAIL_REFRESH_TOKEN -e HELIOS_GMAIL_EMAIL backend python /app/scripts/connect_gmail.py
+    docker compose exec -e HELIOS_GMAIL_REFRESH_TOKEN -e HELIOS_GMAIL_EMAIL \
+        backend python scripts/connect_gmail.py
 """
 
 from __future__ import annotations
@@ -22,12 +23,11 @@ from pathlib import Path
 # (the script lives in /app/scripts but 'app' is at /app/app).
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from sqlalchemy import select  # noqa: E402
-
 from app.config import get_settings  # noqa: E402
 from app.database.models import EmailAccount, User  # noqa: E402
 from app.database.session import get_sessionmaker  # noqa: E402
 from app.security.encryption import encrypt  # noqa: E402
+from sqlalchemy import select  # noqa: E402
 
 
 def main() -> int:
@@ -44,9 +44,7 @@ def main() -> int:
     owner = settings.owner_username
     session = get_sessionmaker()()
     try:
-        user = session.execute(
-            select(User).where(User.external_ref == owner)
-        ).scalar_one_or_none()
+        user = session.execute(select(User).where(User.external_ref == owner)).scalar_one_or_none()
         if user is None:
             user = User(external_ref=owner)
             session.add(user)
