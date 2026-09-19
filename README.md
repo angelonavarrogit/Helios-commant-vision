@@ -25,10 +25,18 @@ En construcción por fases. Fase actual: **Fase 6 — Classification Engine**.
 | 3 | Telegram bot (/start, /help, allow-list) | Completada |
 | 4 | Email Provider (EmailProvider, Gmail read-only, registry) | Completada |
 | 5 | Email Pipeline (fetch→parse→normalize→store→classify) | Completada |
-| 6 | Classification Engine (híbrido reglas + LLM Ollama) | En curso |
-| 7-11 | Agentes (Finance/Insurance/Work/Security) + Supervisor | Pendiente |
-| 5.7 | HELIOS COMMAND (frontend + connections) tras Fase 6 | Diseñada ([docs](docs/helios-command.md)) |
-| 12-17 | Telegram intelligence, reports, documents, memory, hardening | Pendiente |
+| 6 | Classification Engine (híbrido reglas + LLM Ollama) | Completada |
+| 7-10 | Agentes (Finance/Insurance/Work/Security) | Completada |
+| 11 | Orchestrator + Supervisor | Completada |
+| 12 | Telegram intelligence + notificaciones | Completada |
+| 5.7 | HELIOS COMMAND (auth + connections + frontend) | Completada |
+| 13 | Daily/Weekly Reports | Completada |
+| 14 | Document Intelligence (PDF/Excel/Word) | Completada |
+| 15 | Memory (búsqueda estructurada; semántica diferida) | Completada |
+| 17 | Hardening (rate limit, gate anti-inyección, docs) | Completada |
+
+Ingesta vía `POST /api/v1/emails/process` (token de servicio, para N8N).
+Detalle de seguridad y controles en [`docs/hardening.md`](docs/hardening.md).
 
 ## Arquitectura (resumen)
 

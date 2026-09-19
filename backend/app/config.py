@@ -74,6 +74,8 @@ class Settings(BaseSettings):
 
     # Processing guardrails
     max_email_body_chars: int = Field(default=50_000, ge=1_000)
+    # Rate limit for POST /emails/process (calls per minute).
+    process_rate_limit_per_minute: int = Field(default=120, ge=1)
 
     @property
     def is_prod(self) -> bool:

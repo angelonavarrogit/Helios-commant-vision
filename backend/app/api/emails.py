@@ -30,11 +30,17 @@ from app.database.session import get_db
 from app.email.registry import registry
 from app.observability import get_logger
 from app.security import decrypt
+from app.security.rate_limit import RateLimiter
 from app.services.pipeline import EmailPipeline
 from app.services.reports import ReportService
 
 router = APIRouter(prefix="/api/v1/emails", tags=["emails"])
 logger = get_logger("app.api.emails")
+
+# Process-wide limiter for the ingestion endpoint (Phase 17 hardening).
+_process_limiter = RateLimiter(
+    max_calls=get_settings().process_rate_limit_per_minute, window_seconds=60.0
+)
 
 
 class ProcessRequest(BaseModel):
@@ -81,6 +87,12 @@ async def process_email(
     _auth: Annotated[None, Depends(require_service_token)],
 ) -> ProcessResponse:
     """Process one provider message through the full HELIOS pipeline."""
+    # Rate limit per account to absorb bursts / abuse (T-D2).
+    if not _process_limiter.allow(f"process:{payload.account_id}"):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Rate limit exceeded"
+        )
+
     account = session.get(EmailAccount, payload.account_id)
     if account is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
