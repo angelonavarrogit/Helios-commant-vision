@@ -12,10 +12,11 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code and migration tooling
+# Copy application code, migration tooling and operator scripts
 COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini ./alembic.ini
+COPY scripts ./scripts
 
 # Run as non-root (least privilege)
 RUN useradd --create-home --uid 10001 appuser \
