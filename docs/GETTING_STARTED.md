@@ -225,6 +225,10 @@ Con el bot configurado (paso 3), escríbele a tu bot:
 Y recibirás **alertas automáticas** cuando llegue algo importante
 (critical/high), sin spam (se agrupan los eventos repetidos).
 
+> El bot corre como el servicio `bot` del compose (long-polling). Se arranca solo
+> con `docker compose up -d`. Revisa sus logs con `docker compose logs -f bot`.
+> Necesita `TELEGRAM_BOT_TOKEN` y `TELEGRAM_ALLOWED_USER_IDS` en `.env`.
+
 ---
 
 ## 10. Informes automáticos (opcional)

@@ -63,6 +63,21 @@ services:
       - backnet
     restart: unless-stopped
 
+  bot:
+    build:
+      context: ./backend
+    command: ["python", "-m", "app.telegram.run"]
+    env_file: .env
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      # backnet: read the DB for query commands.
+      # frontnet: reach the Telegram API (outbound internet).
+      - backnet
+      - frontnet
+    restart: unless-stopped
+
   frontend:
     build:
       context: ./frontend

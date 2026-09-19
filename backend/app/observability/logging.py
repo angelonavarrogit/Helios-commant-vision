@@ -66,6 +66,12 @@ def configure_logging(level: str = "INFO") -> None:
     root.addHandler(handler)
     root.setLevel(level.upper())
 
+    # httpx logs each request URL at INFO. For Telegram/Google those URLs embed
+    # the bot token / auth material, so we raise httpx to WARNING to avoid
+    # leaking secrets into logs (steering §2, §6).
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+
 
 def get_logger(name: str) -> logging.Logger:
     """Return a named logger."""
