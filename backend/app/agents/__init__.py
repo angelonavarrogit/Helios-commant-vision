@@ -4,6 +4,7 @@ Each agent implements the common BaseAgent contract (see docs/agents.md).
 """
 
 from app.agents.base import AgentResult, AnalysisContext, BaseAgent, Finding
+from app.agents.documents import DocumentAgent
 from app.agents.finance import FinanceAgent
 from app.agents.insurance import InsuranceAgent
 from app.agents.orchestrator import Orchestrator
@@ -15,6 +16,7 @@ __all__ = [
     "AgentResult",
     "AnalysisContext",
     "BaseAgent",
+    "DocumentAgent",
     "FinanceAgent",
     "Finding",
     "InsuranceAgent",
