@@ -10,9 +10,10 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
-from app.api import auth, connections, health
+from app.api import auth, connections, emails, health
 from app.config import get_settings
 from app.observability import configure_logging, get_logger
 
@@ -42,9 +43,24 @@ def create_app() -> FastAPI:
         redoc_url=None if settings.is_prod else "/redoc",
         lifespan=lifespan,
     )
+
+    # CORS: only the configured frontend origin(s) may call the API with
+    # credentials. allow_credentials=True is required so the session cookie is
+    # sent cross-origin; it forbids the "*" wildcard, hence the explicit list.
+    origins = settings.cors_origin_list
+    if origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=origins,
+            allow_credentials=True,
+            allow_methods=["GET", "POST"],
+            allow_headers=["Content-Type"],
+        )
+
     app.include_router(health.router)
     app.include_router(auth.router)
     app.include_router(connections.router)
+    app.include_router(emails.router)
     return app
 
 

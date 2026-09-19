@@ -63,6 +63,15 @@ class Settings(BaseSettings):
     # Base URL used to build the OAuth redirect URI (Phase 5.7).
     public_base_url: str = "http://localhost:8000"
 
+    # Comma-separated list of allowed CORS origins for HELIOS COMMAND (frontend).
+    # Kept restrictive: only the configured frontend origin(s) may call the API
+    # with credentials (cookies). Empty means "no cross-origin allowed".
+    cors_origins: str = "http://localhost:5173"
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
     # Processing guardrails
     max_email_body_chars: int = Field(default=50_000, ge=1_000)
 
