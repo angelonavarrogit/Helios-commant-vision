@@ -47,17 +47,29 @@ class EmailAccount(Base, TimestampMixin):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     provider: Mapped[str] = mapped_column(String(32))  # gmail | outlook
     email_address: Mapped[str] = mapped_column(String(320))
-    # Reference to encrypted OAuth material stored outside the DB (never in clear).
+    # Provider's stable account id (the email can change; this id does not).
+    external_account_id: Mapped[str | None] = mapped_column(String(255))
+    # Reference to encrypted OAuth material (never stored in clear).
     oauth_ref: Mapped[str | None] = mapped_column(String(255))
+    # Encrypted refresh token (Fernet ciphertext). Never stored in clear.
+    encrypted_refresh_token: Mapped[str | None] = mapped_column(Text)
     scopes: Mapped[str | None] = mapped_column(String(512))
-    status: Mapped[str] = mapped_column(String(32), default="active")
+    # Normalized connection status (enforced at the app layer):
+    # connected | connecting | expired | error | disconnected | revoked | reauth_required
+    status: Mapped[str] = mapped_column(String(32), default="disconnected")
+    last_sync_at: Mapped[datetime | None] = mapped_column(DateTime)
+    connected_at: Mapped[datetime | None] = mapped_column(DateTime)
+    token_expires_at: Mapped[datetime | None] = mapped_column(DateTime)
+    last_error: Mapped[str | None] = mapped_column(String(512))
 
     user: Mapped[User] = relationship(back_populates="accounts")
     emails: Mapped[list[Email]] = relationship(
         back_populates="account", cascade="all, delete-orphan"
     )
 
-    __table_args__ = (UniqueConstraint("provider", "email_address"),)
+    # A user may hold several accounts per provider, uniquely keyed by the
+    # provider's external account id (supports multi-account, multi-user).
+    __table_args__ = (UniqueConstraint("user_id", "provider", "external_account_id"),)
 
 
 class Institution(Base, TimestampMixin):

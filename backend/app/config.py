@@ -53,6 +53,16 @@ class Settings(BaseSettings):
     encryption_key: str = ""
     service_api_token: str = ""
 
+    # HELIOS COMMAND auth (Phase 5.7). Single owner account for the self-hosted
+    # app. Password is stored ONLY as a scrypt hash (never in clear).
+    owner_username: str = "owner"
+    owner_password_hash: str = ""
+    session_secret: str = ""
+    session_ttl_seconds: int = 60 * 60 * 8  # 8 hours
+
+    # Base URL used to build the OAuth redirect URI (Phase 5.7).
+    public_base_url: str = "http://localhost:8000"
+
     # Processing guardrails
     max_email_body_chars: int = Field(default=50_000, ge=1_000)
 
