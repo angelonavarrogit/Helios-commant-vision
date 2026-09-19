@@ -53,12 +53,14 @@ class _LLMClassification(BaseModel):
     structure and confidence range.
     """
 
-    category: str
+    # All fields have defaults: local models often omit some (e.g. confidence).
+    # We stay resilient rather than reject an otherwise-usable classification.
+    category: str = "other"
     subcategory: str | None = None
-    priority: str
+    priority: str = "informational"
     risk_level: str = "low"
     requires_action: bool = False
-    confidence: float = Field(ge=0.0, le=1.0)
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
 
 
 def _build_user_prompt(email: NormalizedEmail) -> str:
