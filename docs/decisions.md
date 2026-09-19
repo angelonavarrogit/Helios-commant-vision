@@ -268,3 +268,16 @@ implementar. **No se implementan hasta tu confirmación.**
   reversible cuando se implemente la fase.
 - **Consecuencias**: soporte real de multi-cuenta/multi-usuario y estados de
   conexión; requiere migración de datos.
+
+## ADR-028 — Memory: structured search now, semantic search deferred
+- **Estado**: accepted
+- **Contexto**: la Fase 15 pide memoria consultable. La búsqueda semántica
+  (embeddings + vector DB) aporta valor pero añade infraestructura y un pipeline
+  de embeddings.
+- **Decisión**: implementar primero **búsqueda estructurada por palabra clave**
+  (`MemoryService` + `search_emails` con LIKE parametrizado y wildcards
+  escapados). La **búsqueda semántica** queda propuesta: Ollama puede generar
+  embeddings localmente (coherente con ADR-016) y se evaluaría un vector store
+  (o pgvector/Redis) cuando el volumen lo justifique. Reabrir junto a PROP-005.
+- **Consecuencias**: memoria útil hoy sin infraestructura nueva; camino claro a
+  semántica sin rediseño (el `MemoryService` es el punto de extensión).

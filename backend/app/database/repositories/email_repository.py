@@ -199,6 +199,30 @@ class EmailRepository:
         """Return the total number of stored emails."""
         return self._session.execute(select(func.count()).select_from(Email)).scalar_one()
 
+    def search_emails(self, term: str, *, limit: int = 20) -> list[Email]:
+        """Structured keyword search over subject and body (case-insensitive).
+
+        Parameterized LIKE (ADR-015: never string-concatenated SQL). The term is
+        matched as a literal substring; wildcard characters are escaped so a
+        user cannot craft a pattern that scans the whole table.
+        """
+        cleaned = term.strip()
+        if not cleaned:
+            return []
+        # Escape LIKE wildcards so % and _ are treated literally.
+        escaped = cleaned.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        pattern = f"%{escaped}%"
+        stmt = (
+            select(Email)
+            .where(
+                (Email.subject.ilike(pattern, escape="\\"))
+                | (Email.body_text.ilike(pattern, escape="\\"))
+            )
+            .order_by(Email.id.desc())
+            .limit(limit)
+        )
+        return list(self._session.execute(stmt).scalars().all())
+
     def classifications_since(self, since: datetime) -> list[Classification]:
         """Return classifications for emails created on/after ``since``.
 

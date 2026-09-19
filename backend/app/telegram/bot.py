@@ -54,6 +54,12 @@ async def _dispatch(command: str, user_id: int | None) -> str:
     if is_report_command(command):
         return _run_report(command)
 
+    # Search command (/buscar <term>) — takes an argument.
+    normalized = command.strip().split()[0].lower().split("@", 1)[0] if command.strip() else ""
+    if normalized == "/buscar":
+        term = command.strip()[len(command.strip().split()[0]) :].strip()
+        return _run_search(term)
+
     return "Comando no reconocido. Usa /help."
 
 
@@ -101,6 +107,22 @@ def _run_report(command: str) -> str:
         return "No pude generar el informe ahora. Intenta más tarde."
 
 
+def _run_search(term: str) -> str:
+    """Answer /buscar <term> by searching the email memory."""
+    try:
+        from app.database.session import get_sessionmaker
+        from app.services.memory import MemoryService
+
+        session = get_sessionmaker()()
+        try:
+            return MemoryService(session).search(term)
+        finally:
+            session.close()
+    except Exception as exc:  # noqa: BLE001 - never leak internals to the user
+        logger.warning("search_failed", extra={"error": type(exc).__name__})
+        return "No pude buscar ahora. Intenta más tarde."
+
+
 async def _handle_start(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
     await _reply_to_update(update, "/start")
 
@@ -141,7 +163,7 @@ def build_application() -> Application[Any, Any, Any, Any, Any, Any]:
         "seguridad",
         "pendientes",
     )
-    for cmd in (*intel_cmds, "hoy", "semana"):
+    for cmd in (*intel_cmds, "hoy", "semana", "buscar"):
         application.add_handler(CommandHandler(cmd, _handle_intelligence))
     return application
 
