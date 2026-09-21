@@ -16,8 +16,16 @@ export function Layout() {
   return (
     <div className="flex min-h-screen bg-helios-bg text-helios-text">
       <aside className="w-56 shrink-0 border-r border-helios-border bg-helios-panel p-4">
-        <div className="mb-8 flex items-center gap-2 text-lg font-semibold">
-          <span className="text-helios-accent">☀️</span> HELIOS
+        <div className="mb-8 flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-md border border-helios-accent/60 text-sm font-bold tracking-tight text-helios-accent">
+            AN
+          </span>
+          <div className="leading-tight">
+            <div className="text-base font-semibold">HELIOS</div>
+            <div className="text-[10px] uppercase tracking-widest text-helios-muted">
+              Angelo Navarro
+            </div>
+          </div>
         </div>
         <nav className="flex flex-col gap-1">
           {NAV.map((item) => (

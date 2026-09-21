@@ -35,8 +35,16 @@ export function Login() {
         onSubmit={onSubmit}
         className="w-80 rounded-xl border border-helios-border bg-helios-panel p-6"
       >
-        <div className="mb-6 text-center text-xl font-semibold">
-          <span className="text-helios-accent">☀️</span> HELIOS COMMAND
+        <div className="mb-6 flex flex-col items-center gap-2">
+          <span className="flex h-11 w-11 items-center justify-center rounded-lg border border-helios-accent/60 text-base font-bold tracking-tight text-helios-accent">
+            AN
+          </span>
+          <div className="text-center">
+            <div className="text-lg font-semibold">HELIOS COMMAND</div>
+            <div className="text-[10px] uppercase tracking-widest text-helios-muted">
+              Angelo Navarro
+            </div>
+          </div>
         </div>
 
         <label className="mb-1 block text-sm text-helios-muted">Usuario</label>
