@@ -26,10 +26,16 @@ export interface SettingStatus {
   value?: string;
 }
 
+export interface TestResult {
+  ok: boolean;
+  detail: string;
+}
+
 export const settingsApi = {
   status: () => api.get<Record<string, SettingStatus>>("/api/v1/settings"),
   set: (key: string, value: string) =>
     api.put<{ status: string }>("/api/v1/settings", { key, value }),
+  test: (provider: string) => api.post<TestResult>(`/api/v1/settings/test/${provider}`),
   changePassword: (currentPassword: string, newPassword: string) =>
     api.post<{ status: string }>("/api/v1/auth/change-password", {
       current_password: currentPassword,

@@ -16,12 +16,29 @@ the key that decrypts this table cannot live inside it).
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
+import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.database.models import AppSetting
+from app.observability import get_logger
 from app.security.encryption import decrypt, encrypt
+
+logger = get_logger("app.services.settings")
+
+_TEST_TIMEOUT = 15.0
+
+
+@dataclass(frozen=True)
+class TestResult:
+    """Outcome of a connection test. ``detail`` is safe to show (no secrets)."""
+
+    ok: bool
+    detail: str
+
 
 # Keys that may be managed from the UI. Each maps to its `.env` fallback getter.
 # The owner password hash is handled separately (change-password endpoint).
@@ -127,3 +144,70 @@ class SettingsService:
                 entry["value"] = db_value or env_value
             result[key] = entry
         return result
+
+    # -- connection tests (verify a saved secret actually works) --------------
+
+    async def test_connection(self, provider: str) -> TestResult:
+        """Verify a provider's effective credentials by calling its API.
+
+        Uses the effective value (DB over env). Never includes the secret in the
+        returned detail. Any failure is normalized to a safe, friendly message.
+        """
+        if provider == "telegram":
+            return await self._test_telegram()
+        if provider == "openai":
+            return await self._test_openai()
+        if provider == "ollama":
+            return await self._test_ollama()
+        return TestResult(ok=False, detail="Proveedor de prueba desconocido.")
+
+    async def _test_telegram(self) -> TestResult:
+        token = self.get_effective("telegram_bot_token")
+        if not token:
+            return TestResult(ok=False, detail="No hay token de Telegram configurado.")
+        try:
+            async with httpx.AsyncClient(timeout=_TEST_TIMEOUT) as client:
+                resp = await client.get(f"https://api.telegram.org/bot{token}/getMe")
+            data = resp.json()
+            if resp.status_code == 200 and data.get("ok"):
+                username = data.get("result", {}).get("username", "")
+                return TestResult(ok=True, detail=f"Conectado como @{username}.")
+            return TestResult(ok=False, detail="Token de Telegram inválido.")
+        except (httpx.HTTPError, ValueError) as exc:
+            logger.warning("telegram_test_failed", extra={"error": type(exc).__name__})
+            return TestResult(ok=False, detail="No se pudo contactar con Telegram.")
+
+    async def _test_openai(self) -> TestResult:
+        api_key = self.get_effective("openai_api_key")
+        if not api_key:
+            return TestResult(ok=False, detail="No hay API key de OpenAI configurada.")
+        try:
+            async with httpx.AsyncClient(timeout=_TEST_TIMEOUT) as client:
+                resp = await client.get(
+                    "https://api.openai.com/v1/models",
+                    headers={"Authorization": f"Bearer {api_key}"},
+                )
+            if resp.status_code == 200:
+                return TestResult(ok=True, detail="API key de OpenAI válida.")
+            if resp.status_code in (401, 403):
+                return TestResult(ok=False, detail="API key de OpenAI inválida.")
+            return TestResult(ok=False, detail="OpenAI respondió con un error.")
+        except httpx.HTTPError as exc:
+            logger.warning("openai_test_failed", extra={"error": type(exc).__name__})
+            return TestResult(ok=False, detail="No se pudo contactar con OpenAI.")
+
+    async def _test_ollama(self) -> TestResult:
+        settings = get_settings()
+        url = settings.ollama_url.rstrip("/")
+        try:
+            async with httpx.AsyncClient(timeout=_TEST_TIMEOUT) as client:
+                resp = await client.get(f"{url}/api/tags")
+            if resp.status_code == 200:
+                models = [m.get("name", "") for m in resp.json().get("models", [])]
+                return TestResult(
+                    ok=True, detail=f"Ollama activo. Modelos: {', '.join(models) or 'ninguno'}."
+                )
+            return TestResult(ok=False, detail="Ollama respondió con un error.")
+        except (httpx.HTTPError, ValueError) as exc:
+            logger.warning("ollama_test_failed", extra={"error": type(exc).__name__})
+            return TestResult(ok=False, detail="No se pudo contactar con Ollama.")

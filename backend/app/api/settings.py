@@ -60,6 +60,31 @@ async def set_setting(
     return {"status": "saved"}
 
 
+class TestResponse(BaseModel):
+    ok: bool
+    detail: str
+
+
+_TESTABLE_PROVIDERS = frozenset({"telegram", "openai", "ollama"})
+
+
+@router.post("/test/{provider}", response_model=TestResponse)
+async def test_connection(
+    provider: str,
+    _user: Annotated[str, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_db)],
+) -> TestResponse:
+    """Verify a provider's saved credentials by calling its API.
+
+    Returns a safe ok/detail result; never echoes the secret. Lets the user
+    confirm from the Settings screen that a token/key actually works.
+    """
+    if provider not in _TESTABLE_PROVIDERS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown provider")
+    result = await SettingsService(session).test_connection(provider)
+    return TestResponse(ok=result.ok, detail=result.detail)
+
+
 @router.delete("/{key}")
 async def delete_setting(
     key: str,
