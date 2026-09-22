@@ -14,6 +14,7 @@ by checking before insert, backed by the unique constraint in the schema.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from sqlalchemy import func, select
@@ -31,6 +32,25 @@ from app.database.models import (
     SupervisorDecision,
 )
 from app.email.normalizer import NormalizedEmail
+
+
+@dataclass(frozen=True)
+class BriefingItem:
+    """A readable, safe view of one analyzed email for the executive summary.
+
+    All fields come from already-sanitized/masked stored data (subject, the
+    supervisor's summary/action). No secrets or raw bodies.
+    """
+
+    email_id: int
+    subject: str | None
+    sender: str | None
+    category: str
+    priority: str
+    requires_action: bool
+    deadline: datetime | None
+    summary: str | None
+    recommended_action: str | None
 
 
 class EmailRepository:
@@ -222,6 +242,47 @@ class EmailRepository:
             .limit(limit)
         )
         return list(self._session.execute(stmt).scalars().all())
+
+    def recent_briefing_items(self, *, limit: int = 50) -> list[BriefingItem]:
+        """Return recent analyzed emails with readable, safe fields.
+
+        Joins Email → Classification → (latest) AgentRun → SupervisorDecision so
+        the summary can name real subjects and surface the supervisor's masked
+        summary/recommended action, instead of opaque ids. Newest first.
+        """
+        stmt = (
+            select(
+                Email.id,
+                Email.subject,
+                Email.sender,
+                Classification.category,
+                Classification.priority,
+                Classification.requires_action,
+                Classification.deadline,
+                SupervisorDecision.summary,
+                SupervisorDecision.recommended_action,
+            )
+            .join(Classification, Classification.email_id == Email.id)
+            .outerjoin(AgentRun, AgentRun.email_id == Email.id)
+            .outerjoin(SupervisorDecision, SupervisorDecision.agent_run_id == AgentRun.id)
+            .order_by(Email.id.desc())
+            .limit(limit)
+        )
+        rows = self._session.execute(stmt).all()
+        return [
+            BriefingItem(
+                email_id=r[0],
+                subject=r[1],
+                sender=r[2],
+                category=r[3],
+                priority=r[4],
+                requires_action=bool(r[5]),
+                deadline=r[6],
+                summary=r[7],
+                recommended_action=r[8],
+            )
+            for r in rows
+        ]
 
     def classifications_since(self, since: datetime) -> list[Classification]:
         """Return classifications for emails created on/after ``since``.
