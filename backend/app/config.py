@@ -88,6 +88,42 @@ class Settings(BaseSettings):
     def is_prod(self) -> bool:
         return self.app_env == "prod"
 
+    # Secrets that must be present (non-empty) before running in production.
+    _REQUIRED_PROD_SECRETS = (
+        "session_secret",
+        "encryption_key",
+        "owner_password_hash",
+        "service_api_token",
+    )
+    # Insecure example values that must never reach production.
+    _INSECURE_MARKERS = ("changeme", "change-me", "__set", "placeholder")
+
+    def validate_for_prod(self) -> list[str]:
+        """Return a list of configuration problems that block a prod boot.
+
+        Empty list means the configuration is safe for production. This is a
+        fail-closed check: it only flags issues, the caller decides to raise.
+        Never returns secret values — only the names of offending settings.
+        """
+        problems: list[str] = []
+        if not self.is_prod:
+            return problems
+
+        for name in self._REQUIRED_PROD_SECRETS:
+            if not str(getattr(self, name, "")).strip():
+                problems.append(f"{name.upper()} is required in production but is empty")
+
+        # DB credentials must not carry the insecure example markers.
+        db = self.database_url.lower()
+        if any(marker in db for marker in self._INSECURE_MARKERS):
+            problems.append("DATABASE_URL still contains an insecure example password")
+
+        # If a public URL is set in prod it should be HTTPS (cookies are Secure).
+        if self.public_base_url and not self.public_base_url.startswith("https://"):
+            problems.append("PUBLIC_BASE_URL should be https:// in production")
+
+        return problems
+
 
 @lru_cache
 def get_settings() -> Settings:

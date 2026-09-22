@@ -29,6 +29,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         "application_starting",
         extra={"app": settings.app_name, "env": settings.app_env, "version": __version__},
     )
+    # Fail closed on insecure production configuration (Phase 2, D3). Only the
+    # offending setting NAMES are logged/raised — never their values.
+    problems = settings.validate_for_prod()
+    if problems:
+        logger.error("insecure_production_config", extra={"problems": problems})
+        raise RuntimeError("Insecure production configuration: " + "; ".join(problems))
     yield
     logger.info("application_stopping", extra={"app": settings.app_name})
 

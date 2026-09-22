@@ -25,6 +25,9 @@ def api(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[TestClient, int]]:
     Also registers a 'fake' provider factory (seeded with one message) and sets
     a known service token.
     """
+    # Pin local env so the prod startup guard (validate_for_prod) is a no-op
+    # under the TestClient lifespan regardless of ambient APP_ENV.
+    monkeypatch.setenv("APP_ENV", "local")
     monkeypatch.setenv("SERVICE_API_TOKEN", "svc-token")
     get_settings.cache_clear()
 

@@ -21,11 +21,20 @@ def _enable_sqlite_fks(dbapi_connection: object, _connection_record: object) -> 
 
 
 @pytest.fixture
-def client() -> Iterator[TestClient]:
-    """A TestClient bound to a freshly created app instance."""
+def client(monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
+    """A TestClient bound to a freshly created app instance.
+
+    Pins APP_ENV=local so the production startup guard (validate_for_prod) is a
+    no-op under the TestClient lifespan regardless of the ambient environment.
+    """
+    monkeypatch.setenv("APP_ENV", "local")
+    from app.config import get_settings
+
+    get_settings.cache_clear()
     app = create_app()
     with TestClient(app) as test_client:
         yield test_client
+    get_settings.cache_clear()
 
 
 @pytest.fixture
