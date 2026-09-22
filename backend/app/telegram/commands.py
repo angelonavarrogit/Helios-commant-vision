@@ -2,28 +2,49 @@
 
 The command handlers here are pure functions returning text; they contain no
 Telegram transport code so they can be unit-tested without network or tokens.
-Phase 3 ships `/start` and `/help`; intelligence commands (/resumen, /urgentes,
-/finanzas, /seguros, /trabajo, /seguridad, /documentos, /pendientes, /hoy,
-/semana) are wired in Phase 12.
+The /help text is user-facing: it lists real, working commands grouped by
+purpose — no internal roadmap/phase jargon.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-# Commands planned for later phases, advertised in /help so the user knows the
-# roadmap. They are not yet functional.
-_PLANNED_COMMANDS: tuple[tuple[str, str], ...] = (
-    ("/resumen", "Resumen del día (Fase 12)"),
-    ("/urgentes", "Asuntos urgentes (Fase 12)"),
-    ("/finanzas", "Eventos financieros (Fase 12)"),
-    ("/seguros", "Seguros y pólizas (Fase 12)"),
-    ("/trabajo", "Asuntos laborales (Fase 12)"),
-    ("/seguridad", "Alertas de seguridad (Fase 12)"),
-    ("/documentos", "Documentos detectados (Fase 14)"),
-    ("/pendientes", "Tareas pendientes (Fase 12)"),
-    ("/hoy", "Actividad de hoy (Fase 12)"),
-    ("/semana", "Actividad de la semana (Fase 12)"),
+# User-facing command catalog, grouped for /help. Every command listed here is
+# functional. Keep descriptions friendly and free of internal jargon.
+_HELP_GROUPS: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
+    (
+        "📊 Resúmenes",
+        (
+            ("/resumen", "Resumen general"),
+            ("/hoy", "Lo de hoy"),
+            ("/semana", "Lo de la semana"),
+        ),
+    ),
+    (
+        "🔔 Atención",
+        (
+            ("/urgentes", "Asuntos urgentes"),
+            ("/pendientes", "Requieren tu acción"),
+        ),
+    ),
+    (
+        "🗂️ Por área",
+        (
+            ("/finanzas", "Movimientos y cargos"),
+            ("/seguros", "Pólizas y vencimientos"),
+            ("/trabajo", "Reuniones y tareas"),
+            ("/seguridad", "Accesos y alertas"),
+        ),
+    ),
+    (
+        "🔎 Búsqueda",
+        (("/buscar <término>", "Buscar en tu correo"),),
+    ),
+    (
+        "⚙️ Sistema",
+        (("/estado", "Salud del sistema y conexiones"),),
+    ),
 )
 
 
@@ -39,23 +60,21 @@ def start_reply() -> CommandReply:
     return CommandReply(
         text=(
             "☀️ HELIOS activo.\n\n"
-            "Soy tu centro personal de inteligencia. Observo, entiendo, priorizo "
-            "y te aviso de lo importante.\n\n"
-            "Usa /help para ver los comandos disponibles."
+            "Soy tu centro personal de inteligencia. Observo tu correo, entiendo "
+            "lo que llega, lo priorizo y te aviso de lo importante — sin ruido.\n\n"
+            "Escribe /help para ver qué puedo hacer."
         )
     )
 
 
 def help_reply() -> CommandReply:
-    """Reply for /help listing available and planned commands."""
-    lines = [
-        "Comandos disponibles:",
-        "/start — iniciar",
-        "/help — esta ayuda",
-        "",
-        "Próximamente:",
-    ]
-    lines.extend(f"{cmd} — {desc}" for cmd, desc in _PLANNED_COMMANDS)
+    """Reply for /help — real commands grouped by purpose (no jargon)."""
+    lines = ["☀️ HELIOS — ¿qué necesitas?", ""]
+    for group_title, commands in _HELP_GROUPS:
+        lines.append(group_title)
+        lines.extend(f"  {cmd} — {desc}" for cmd, desc in commands)
+        lines.append("")
+    lines.append("Básicos: /start · /help")
     return CommandReply(text="\n".join(lines))
 
 
@@ -97,6 +116,11 @@ REPORT_COMMANDS: dict[str, str] = {
     "/hoy": "daily",
     "/semana": "weekly",
 }
+
+
+def is_status_command(command: str) -> bool:
+    """True if the command is the system-status command (/estado)."""
+    return _normalize(command) == "/estado"
 
 
 def is_report_command(command: str) -> bool:

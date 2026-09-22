@@ -17,6 +17,7 @@ from app.telegram.authorization import is_authorized
 from app.telegram.commands import (
     is_intelligence_command,
     is_report_command,
+    is_status_command,
     query_method_for,
     report_method_for,
     resolve_command,
@@ -53,6 +54,10 @@ async def _dispatch(command: str, user_id: int | None) -> str:
     # Report commands (/hoy, /semana).
     if is_report_command(command):
         return _run_report(command)
+
+    # System status command (/estado).
+    if is_status_command(command):
+        return _run_status()
 
     # Search command (/buscar <term>) — takes an argument.
     normalized = command.strip().split()[0].lower().split("@", 1)[0] if command.strip() else ""
@@ -105,6 +110,22 @@ def _run_report(command: str) -> str:
     except Exception as exc:  # noqa: BLE001 - never leak internals to the user
         logger.warning("report_failed", extra={"error": type(exc).__name__})
         return "No pude generar el informe ahora. Intenta más tarde."
+
+
+def _run_status() -> str:
+    """Answer /estado with a real system-health snapshot."""
+    try:
+        from app.database.session import get_sessionmaker
+        from app.services.status_service import StatusService
+
+        session = get_sessionmaker()()
+        try:
+            return StatusService(session).as_text()
+        finally:
+            session.close()
+    except Exception as exc:  # noqa: BLE001 - never leak internals to the user
+        logger.warning("status_failed", extra={"error": type(exc).__name__})
+        return "No pude consultar el estado ahora. Intenta más tarde."
 
 
 def _run_search(term: str) -> str:
@@ -163,7 +184,7 @@ def build_application() -> Application[Any, Any, Any, Any, Any, Any]:
         "seguridad",
         "pendientes",
     )
-    for cmd in (*intel_cmds, "hoy", "semana", "buscar"):
+    for cmd in (*intel_cmds, "hoy", "semana", "buscar", "estado"):
         application.add_handler(CommandHandler(cmd, _handle_intelligence))
     return application
 

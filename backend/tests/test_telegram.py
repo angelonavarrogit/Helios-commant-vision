@@ -121,3 +121,45 @@ async def test_dispatch_unauthorized_blocks_intelligence() -> None:
     # Even a valid intelligence command must be refused for non-allow-listed users.
     text = await bot._dispatch("/resumen", user_id=999)
     assert text == "Acceso no autorizado."
+
+
+# --- Help text is user-facing (no internal phase/roadmap jargon) -------------
+
+
+def test_help_has_no_phase_jargon() -> None:
+    reply = resolve_command("/help")
+    assert reply is not None
+    lowered = reply.text.lower()
+    # The help must not leak internal roadmap terms to the end user.
+    assert "fase" not in lowered
+    assert "phase" not in lowered
+
+
+def test_help_lists_real_commands() -> None:
+    reply = resolve_command("/help")
+    assert reply is not None
+    for cmd in ("/resumen", "/urgentes", "/finanzas", "/buscar", "/estado"):
+        assert cmd in reply.text
+
+
+# --- /estado (system status) command -----------------------------------------
+
+from app.telegram.commands import is_status_command  # noqa: E402
+
+
+def test_status_command_detection() -> None:
+    assert is_status_command("/estado") is True
+    assert is_status_command("/estado@HeliosBot") is True
+    assert is_status_command("/resumen") is False
+
+
+async def test_dispatch_status_authorized(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setattr(bot, "is_authorized", lambda _uid: True)
+    monkeypatch.setattr(bot, "_run_status", lambda: "☀️ HELIOS — Estado\n🟢 Core")
+    text = await bot._dispatch("/estado", user_id=123)
+    assert "Estado" in text
+
+
+async def test_dispatch_status_unauthorized_blocked() -> None:
+    text = await bot._dispatch("/estado", user_id=999)
+    assert text == "Acceso no autorizado."
