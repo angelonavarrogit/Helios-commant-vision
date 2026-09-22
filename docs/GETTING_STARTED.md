@@ -256,7 +256,13 @@ Para recibir el informe diario/semanal sin pedirlo:
 - Revisa `docs/hardening.md` (controles) y `docs/operations.md` (runbook).
 - Pásame el **mensaje de error** (sin secretos) y te ayudo a diagnosticar.
 
+## Pasar a producción (en línea, con HTTPS y dominio)
+Cuando lo tengas funcionando en local y quieras validarlo/usarlo en línea, sigue
+**`docs/PRODUCTION_CLOUDFLARE.md`**: publica el frontend y el API con
+**Cloudflare Tunnel** (HTTPS gestionado, sin abrir puertos), con la checklist de
+validación end-to-end.
+
 ## Qué queda como mejora futura (no bloquea el uso)
 - OCR de imágenes adjuntas (hoy: PDF/Excel/Word por texto).
 - Búsqueda semántica / memoria vectorial (hoy: búsqueda por palabra).
-- Dashboard web ampliado (hoy: Dashboard mínimo + Connections).
+- Dashboard web ampliado (hoy: Dashboard con KPIs, actividad y estado + Connections Center).

@@ -107,6 +107,11 @@ services:
   frontend:
     build:
       context: ./frontend
+      args:
+        # Public API URL baked into the SPA bundle. Set VITE_API_BASE_URL in
+        # .env for production (e.g. https://api.helios.tudominio.com); defaults
+        # to localhost for local development.
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
     ports:
       - "5173:80"
     depends_on:

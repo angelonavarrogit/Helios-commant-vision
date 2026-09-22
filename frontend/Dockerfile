@@ -9,6 +9,13 @@ WORKDIR /app
 COPY package.json ./
 RUN npm install
 
+# Public base URL of the HELIOS API, baked into the bundle at build time.
+# Defaults to localhost for dev; override in production (e.g. via
+# docker compose build-arg) with your public API URL, e.g.
+#   VITE_API_BASE_URL=https://api.helios.tudominio.com
+ARG VITE_API_BASE_URL=http://localhost:8000
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+
 # Build the production bundle.
 COPY . .
 RUN npm run build
