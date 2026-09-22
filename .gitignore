@@ -11,6 +11,10 @@ token*.json
 secrets/
 *.secret
 
+# Cloudflare Tunnel credentials/config (used in production; keep out of git)
+cloudflared/
+.cloudflared/
+
 # Python
 __pycache__/
 *.py[cod]

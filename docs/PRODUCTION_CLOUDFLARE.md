@@ -52,17 +52,31 @@ si no, registra uno y muévele los DNS a Cloudflare — es gratis para este uso)
 
 ## 2. Instalar `cloudflared` (el agente del túnel) 🧑
 
+Hay **dos formas** de correr el túnel: (A) instalando `cloudflared` en la
+máquina — es la que usamos aquí — o (B) como contenedor Docker junto al stack
+(ver §8B). Elige una sola.
+
+### Opción A — instalar en la máquina (recomendada, la de esta guía)
+
 En Windows (PowerShell, con winget):
 ```powershell
 winget install --id Cloudflare.cloudflared
 ```
-Comprueba:
+Comprueba (abre una terminal **nueva** para que tome el PATH):
 ```powershell
 cloudflared --version
 ```
 
-> Alternativa: descarga el binario desde
+> Ya instalado en esta máquina: **cloudflared 2026.9.1**. Si `cloudflared` no se
+> reconoce en una terminal ya abierta, ciérrala y abre una nueva (es cuestión de
+> PATH).
+>
+> Alternativa de descarga manual (sin winget): binario oficial en
 > https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/
+
+> ¿Prefieres no instalar nada en el host? Salta a **§8B (túnel en Docker)**. En
+> ese caso, los pasos 3 y 4 se hacen igual pero guardando el `config.yml` y las
+> credenciales en una carpeta del proyecto en vez de tu perfil de usuario.
 
 ---
 
@@ -187,6 +201,11 @@ curl http://localhost:8000/health
 
 ## 8. Arrancar el túnel 🧑
 
+Usa **8A** (instalado en la máquina — lo que elegimos) o **8B** (contenedor
+Docker). No las dos a la vez.
+
+### 8A — cloudflared en la máquina (recomendada)
+
 Prueba en primer plano (para ver logs):
 ```powershell
 cloudflared tunnel run helios
@@ -199,6 +218,67 @@ Para dejarlo permanente como **servicio de Windows** (arranca solo con el PC):
 cloudflared service install
 Start-Service cloudflared
 ```
+Gestión del servicio:
+```powershell
+Get-Service cloudflared          # estado
+Restart-Service cloudflared      # reiniciar tras cambiar config.yml
+Stop-Service cloudflared         # detener
+```
+
+### 8B — cloudflared como contenedor Docker (alternativa)
+
+Útil si prefieres no instalar nada en el host y que el túnel viva junto al
+stack. Sigues necesitando los pasos 3.1–3.3 (login/create/route) una vez para
+generar el **certificado**, el **`<TUNNEL_ID>.json`** y el DNS; el contenedor
+solo *corre* el túnel ya creado.
+
+1. Copia las credenciales al proyecto (en una carpeta ignorada por git):
+   ```powershell
+   New-Item -ItemType Directory -Force -Path .\cloudflared | Out-Null
+   Copy-Item "$env:USERPROFILE\.cloudflared\<TUNNEL_ID>.json" .\cloudflared\
+   ```
+2. Crea `.\cloudflared\config.yml` (misma idea que §4, pero apuntando a los
+   servicios **por nombre de red Docker**, no a `localhost`):
+   ```yaml
+   tunnel: TUNNEL_ID
+   credentials-file: /etc/cloudflared/TUNNEL_ID.json
+
+   ingress:
+     - hostname: helios.tudominio.com
+       service: http://frontend:80      # contenedor frontend (nginx)
+     - hostname: api.helios.tudominio.com
+       service: http://backend:8000     # contenedor backend
+     - service: http_status:404
+   ```
+3. Asegura que `.\cloudflared\` esté en `.gitignore` (el `.json` es un secreto):
+   ```powershell
+   Add-Content .gitignore "`ncloudflared/"
+   ```
+4. Añade este servicio a `docker-compose.yml` (dentro de `services:`), en la red
+   `frontnet` para que alcance a `frontend` y `backend`:
+   ```yaml
+     cloudflared:
+       image: cloudflare/cloudflared:latest
+       command: ["tunnel", "--config", "/etc/cloudflared/config.yml", "run"]
+       volumes:
+         - ./cloudflared:/etc/cloudflared:ro
+       depends_on:
+         - backend
+         - frontend
+       networks:
+         - frontnet
+       restart: unless-stopped
+   ```
+5. Levanta el túnel con el resto del stack:
+   ```powershell
+   docker compose up -d cloudflared
+   docker compose logs -f cloudflared    # verifica que conecta
+   ```
+
+> Diferencia clave 8A vs 8B: en 8A el `service:` del `config.yml` apunta a
+> `http://localhost:5173` / `:8000` (puertos publicados al host); en 8B apunta a
+> `http://frontend:80` / `http://backend:8000` (nombres de servicio de la red
+> interna de Docker).
 
 ---
 
@@ -305,6 +385,9 @@ cloudflared tunnel info helios
 4. `.env`: `APP_ENV=prod`, `PUBLIC_BASE_URL`, `CORS_ORIGINS`, `VITE_API_BASE_URL`.
 5. Google Cloud: añade el redirect `https://api.helios..../gmail/callback`.
 6. `docker compose up -d --build` + migraciones.
-7. `cloudflared tunnel run helios` (o instálalo como servicio).
+7. Arranca el túnel:
+   - **8A (máquina):** `cloudflared tunnel run helios` (o instálalo como servicio
+     de Windows). ← lo que usamos.
+   - **8B (Docker):** `docker compose up -d cloudflared`.
 8. Corre la checklist §9.
 ```
