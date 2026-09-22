@@ -124,3 +124,87 @@ async def test_disconnect_clears_token(db_session: Session) -> None:
     assert refreshed is not None
     assert refreshed.status == ConnectionStatus.DISCONNECTED.value
     assert refreshed.encrypted_refresh_token is None
+
+
+# --- Audit log events (Phase 4) ----------------------------------------------
+
+
+async def test_audit_connection_initiated_written(db_session: Session) -> None:
+    """start_oauth must write a CONNECTION_INITIATED audit entry."""
+    from app.database.models import AuditLog
+    from sqlalchemy import select
+
+    mgr = _manager(db_session)
+    mgr.start_oauth(username="owner", provider="gmail", redirect_uri="http://x/cb")
+    entries = (
+        db_session.execute(select(AuditLog).where(AuditLog.action == "CONNECTION_INITIATED"))
+        .scalars()
+        .all()
+    )
+    assert len(entries) == 1
+    assert entries[0].actor == "connections:owner"
+    assert entries[0].detail_json.get("provider") == "gmail"
+
+
+async def test_audit_connection_completed_written(db_session: Session) -> None:
+    """A successful callback must write a CONNECTION_COMPLETED audit entry."""
+    from app.database.models import AuditLog
+    from sqlalchemy import select
+
+    mgr = _manager(db_session)
+    state = create_state(user="owner", provider="gmail")
+    account = await mgr.handle_callback(
+        provider="gmail", code="c", state=state, redirect_uri="http://x/cb"
+    )
+    entries = (
+        db_session.execute(select(AuditLog).where(AuditLog.action == "CONNECTION_COMPLETED"))
+        .scalars()
+        .all()
+    )
+    assert len(entries) == 1
+    assert entries[0].detail_json.get("account_id") == account.id
+
+
+async def test_audit_connection_failed_bad_state(db_session: Session) -> None:
+    """A bad-state callback must write CONNECTION_FAILED (no token exposed)."""
+    from app.database.models import AuditLog
+    from app.services.connections import ConnectionError as ConnError
+    from sqlalchemy import select
+
+    mgr = _manager(db_session)
+    with pytest.raises(ConnError):
+        await mgr.handle_callback(
+            provider="gmail", code="c", state="forged", redirect_uri="http://x/cb"
+        )
+    entries = (
+        db_session.execute(select(AuditLog).where(AuditLog.action == "CONNECTION_FAILED"))
+        .scalars()
+        .all()
+    )
+    assert len(entries) == 1
+    assert entries[0].detail_json.get("reason") == "bad_state"
+    # The audit entry must never contain token material.
+    import json
+
+    raw = json.dumps(entries[0].detail_json)
+    assert "refresh" not in raw.lower() and "token" not in raw.lower()
+
+
+async def test_audit_connection_disconnected_written(db_session: Session) -> None:
+    """disconnect must write CONNECTION_DISCONNECTED to the audit log."""
+    from app.database.models import AuditLog
+    from sqlalchemy import select
+
+    mgr = _manager(db_session)
+    state = create_state(user="owner", provider="gmail")
+    account = await mgr.handle_callback(
+        provider="gmail", code="c", state=state, redirect_uri="http://x/cb"
+    )
+    mgr.disconnect("owner", account.id)
+    entries = (
+        db_session.execute(select(AuditLog).where(AuditLog.action == "CONNECTION_DISCONNECTED"))
+        .scalars()
+        .all()
+    )
+    assert len(entries) == 1
+    assert entries[0].detail_json.get("account_id") == account.id
