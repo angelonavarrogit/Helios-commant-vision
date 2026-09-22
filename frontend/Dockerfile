@@ -9,11 +9,12 @@ WORKDIR /app
 COPY package.json ./
 RUN npm install
 
-# Public base URL of the HELIOS API, baked into the bundle at build time.
-# Defaults to localhost for dev; override in production (e.g. via
-# docker compose build-arg) with your public API URL, e.g.
-#   VITE_API_BASE_URL=https://api.helios.tudominio.com
-ARG VITE_API_BASE_URL=http://localhost:8000
+# Public API base URL, baked into the bundle at build time.
+# EMPTY (default) = same-origin: the SPA calls "/api/..." and nginx proxies it
+# to the backend (see nginx.conf). This is the production setup behind a reverse
+# proxy / Cloudflare Tunnel. For local dev WITHOUT the proxy you may override
+# with e.g. VITE_API_BASE_URL=http://localhost:8000.
+ARG VITE_API_BASE_URL=
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 
 # Build the production bundle.

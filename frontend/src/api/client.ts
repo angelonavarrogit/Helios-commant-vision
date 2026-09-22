@@ -4,7 +4,13 @@
 // authenticates without the frontend ever handling tokens. The base URL comes
 // from VITE_API_BASE_URL; no secrets are stored here.
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+// API base URL. In production the SPA is served behind a reverse proxy that
+// forwards "/api/..." to the backend on the same origin, so the base is empty
+// (relative URLs). For local dev without a proxy, set VITE_API_BASE_URL to the
+// backend origin (e.g. http://localhost:8000). An empty/undefined value means
+// same-origin, which is the safe production default.
+const RAW_BASE = import.meta.env.VITE_API_BASE_URL;
+const BASE_URL = RAW_BASE && RAW_BASE.trim() !== "" ? RAW_BASE : "";
 
 export class ApiError extends Error {
   constructor(
