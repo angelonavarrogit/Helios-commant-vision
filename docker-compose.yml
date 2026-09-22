@@ -68,6 +68,32 @@ services:
       context: ./backend
     command: ["python", "-m", "app.telegram.run"]
     env_file: .env
+    # The bot is a long-polling process (no HTTP server), so the backend's
+    # /health probe from the shared image does not apply. Verify instead that
+    # the polling process is running.
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import os,sys
+          def alive():
+              for p in os.listdir('/proc'):
+                  if not p.isdigit():
+                      continue
+                  try:
+                      with open(f'/proc/{p}/cmdline','rb') as fh:
+                          if b'app.telegram.run' in fh.read():
+                              return True
+                  except OSError:
+                      pass
+              return False
+          sys.exit(0 if alive() else 1)
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
     depends_on:
       mysql:
         condition: service_healthy

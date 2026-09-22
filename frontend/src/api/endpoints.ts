@@ -1,13 +1,28 @@
 // HELIOS COMMAND — endpoint wrappers (thin, typed).
 
 import { api } from "./client";
-import type { Connection, ConnectStart, Provider, User } from "./types";
+import type {
+  ActivityItem,
+  Connection,
+  ConnectStart,
+  DashboardKpis,
+  Provider,
+  SystemStatus,
+  User,
+} from "./types";
 
 export const authApi = {
   login: (username: string, password: string) =>
     api.post<User>("/api/v1/auth/login", { username, password }),
   logout: () => api.post<{ status: string }>("/api/v1/auth/logout"),
   me: () => api.get<User>("/api/v1/auth/me"),
+};
+
+export const dashboardApi = {
+  kpis: () => api.get<DashboardKpis>("/api/v1/dashboard/kpis"),
+  activity: (limit = 20) =>
+    api.get<ActivityItem[]>(`/api/v1/dashboard/activity?limit=${limit}`),
+  system: () => api.get<SystemStatus>("/api/v1/dashboard/system"),
 };
 
 export const connectionsApi = {
