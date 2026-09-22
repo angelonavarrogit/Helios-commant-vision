@@ -318,3 +318,26 @@ class AuditLog(Base):
     action: Mapped[str] = mapped_column(String(128))
     detail_json: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class UserSession(Base):
+    """Server-side session record enabling real revocation (Phase 3).
+
+    The session cookie is still a signed, expiring token, but it now carries an
+    opaque session id (``id`` here). A session is valid only if its row exists,
+    is not revoked and not expired — so logout (which sets ``revoked_at``) truly
+    invalidates it, unlike a purely stateless token. No secrets are stored: the
+    IP and user-agent are kept only as salted hashes for audit, never in clear.
+    """
+
+    __tablename__ = "user_sessions"
+
+    # Opaque session id (the token's jti). Not autoincrement: a random token.
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    username: Mapped[str] = mapped_column(String(255), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime)
+    ip_hash: Mapped[str | None] = mapped_column(String(64))
+    user_agent_hash: Mapped[str | None] = mapped_column(String(64))

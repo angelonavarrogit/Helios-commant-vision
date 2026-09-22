@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -22,9 +22,11 @@ from app.database.session import get_db
 from app.security.auth import (
     create_session_token,
     hash_password,
+    new_session_id,
     verify_password,
-    verify_session_token,
+    verify_session_token_full,
 )
+from app.services.session_service import SessionService
 from app.services.settings_service import SettingsService
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
@@ -42,24 +44,36 @@ class MeResponse(BaseModel):
 
 
 def get_current_user(
+    session: Annotated[Session, Depends(get_db)],
     helios_session: Annotated[str | None, Cookie(alias=_SESSION_COOKIE)] = None,
 ) -> str:
     """FastAPI dependency: return the authenticated owner username or 401.
 
-    Used by protected routers. Returns the username (identity) so downstream code
-    can scope queries to this user.
+    Two-part check: the cookie must be an authentic, unexpired signed token
+    (stateless) AND its session must still be active in the DB (not revoked, not
+    expired). This is what makes logout and revocation effective — a stolen or
+    stale cookie is rejected once its server-side session is gone.
     """
-    username = verify_session_token(helios_session) if helios_session else None
-    if username is None:
+    parsed = verify_session_token_full(helios_session) if helios_session else None
+    if parsed is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required"
         )
+    username, jti = parsed
+    svc = SessionService(session)
+    if not svc.is_active(jti):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required"
+        )
+    svc.touch(jti)
+    session.commit()
     return username
 
 
 @router.post("/login", response_model=MeResponse)
 async def login(
     payload: LoginRequest,
+    request: Request,
     response: Response,
     session: Annotated[Session, Depends(get_db)],
 ) -> MeResponse:
@@ -82,7 +96,16 @@ async def login(
     if not valid:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
-    token = create_session_token(payload.username)
+    # Create a revocable server-side session, then embed its id in the token.
+    jti = new_session_id()
+    SessionService(session).create(
+        session_id=jti,
+        username=payload.username,
+        ip=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+    )
+    session.commit()
+    token = create_session_token(payload.username, session_id=jti)
     response.set_cookie(
         key=_SESSION_COOKIE,
         value=token,
@@ -95,8 +118,21 @@ async def login(
 
 
 @router.post("/logout")
-async def logout(response: Response) -> dict[str, str]:
-    """Clear the session cookie."""
+async def logout(
+    response: Response,
+    session: Annotated[Session, Depends(get_db)],
+    helios_session: Annotated[str | None, Cookie(alias=_SESSION_COOKIE)] = None,
+) -> dict[str, str]:
+    """Revoke the current server-side session and clear the cookie.
+
+    Unlike a stateless token, this makes logout effective immediately: even if
+    the cookie is replayed, ``get_current_user`` will reject the revoked session.
+    """
+    parsed = verify_session_token_full(helios_session) if helios_session else None
+    if parsed is not None:
+        _username, jti = parsed
+        SessionService(session).revoke(jti)
+        session.commit()
     response.delete_cookie(_SESSION_COOKIE)
     return {"status": "ok"}
 
@@ -136,5 +172,8 @@ async def change_password(
             detail="New password must be at least 8 characters",
         )
     svc.set_secret("owner_password_hash", hash_password(payload.new_password))
+    # A password change invalidates every existing session (incl. this one), so
+    # a previously compromised session cannot survive a password reset.
+    revoked = SessionService(session).revoke_all(_username)
     session.commit()
-    return {"status": "ok"}
+    return {"status": "ok", "sessions_revoked": str(revoked)}

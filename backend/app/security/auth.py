@@ -60,17 +60,35 @@ def verify_password(password: str, stored: str) -> bool:
     return hmac.compare_digest(dk, expected)
 
 
-def create_session_token(username: str) -> str:
-    """Create a signed, expiring session token for ``username``."""
+def new_session_id() -> str:
+    """Return a fresh opaque session id (jti) for a server-side session row."""
+    return secrets.token_urlsafe(24)
+
+
+def create_session_token(username: str, session_id: str | None = None) -> str:
+    """Create a signed, expiring session token for ``username``.
+
+    The token embeds an opaque session id (``jti``) so the server can look up a
+    revocable :class:`UserSession` row. ``session_id`` is generated if omitted;
+    callers that persist a session should pass the id they stored.
+
+    Payload layout is ``username:jti:expiry``. ``username`` may not contain ':'
+    (owner usernames don't), so parsing is unambiguous via rsplit.
+    """
     settings = get_settings()
+    jti = session_id or new_session_id()
     expiry = int(time.time()) + settings.session_ttl_seconds
-    payload = f"{username}:{expiry}"
+    payload = f"{username}:{jti}:{expiry}"
     signature = _sign(payload, settings.session_secret)
     return f"{_b64(payload.encode())}.{signature}"
 
 
-def verify_session_token(token: str) -> str | None:
-    """Return the username if the token is valid and unexpired, else None."""
+def _parse_token(token: str) -> tuple[str, str, int] | None:
+    """Verify signature+expiry and return ``(username, jti, expiry)`` or None.
+
+    This is the stateless half: it proves the token is authentic and unexpired.
+    Revocation (the stateful half) is checked separately against the DB.
+    """
     settings = get_settings()
     try:
         payload_b64, signature = token.split(".", 1)
@@ -83,14 +101,33 @@ def verify_session_token(token: str) -> str | None:
         return None
 
     try:
-        username, expiry_str = payload.rsplit(":", 1)
+        username, jti, expiry_str = payload.rsplit(":", 2)
         expiry = int(expiry_str)
     except ValueError:
         return None
 
     if time.time() > expiry:
         return None
-    return username
+    return username, jti, expiry
+
+
+def verify_session_token_full(token: str) -> tuple[str, str] | None:
+    """Return ``(username, jti)`` if the token is authentic and unexpired."""
+    parsed = _parse_token(token)
+    if parsed is None:
+        return None
+    username, jti, _expiry = parsed
+    return username, jti
+
+
+def verify_session_token(token: str) -> str | None:
+    """Return the username if the token is valid and unexpired, else None.
+
+    Backward-compatible helper (stateless check only). New code should use
+    :func:`verify_session_token_full` plus a DB revocation check.
+    """
+    parsed = _parse_token(token)
+    return parsed[0] if parsed else None
 
 
 def _sign(payload: str, secret: str) -> str:
