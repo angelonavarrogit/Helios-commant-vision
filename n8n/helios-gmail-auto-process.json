@@ -1,0 +1,90 @@
+{
+  "name": "HELIOS — Gmail → procesar correo",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": true,
+        "filters": {}
+      },
+      "id": "gmail-trigger",
+      "name": "Gmail Trigger (correo nuevo)",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "position": [
+        260,
+        300
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REEMPLAZA_CON_TU_CREDENCIAL_GMAIL",
+          "name": "Gmail (HELIOS)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:8000/api/v1/emails/process",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Service-Token",
+              "value": "__PON_TU_SERVICE_API_TOKEN__"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ account_id: 4, provider_message_id: $json.id }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "http-process",
+      "name": "HELIOS: procesar correo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Gmail Trigger (correo nuevo)": {
+      "main": [
+        [
+          {
+            "node": "HELIOS: procesar correo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateId": "helios-gmail-auto-process"
+  }
+}
