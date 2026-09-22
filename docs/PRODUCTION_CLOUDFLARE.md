@@ -31,18 +31,54 @@ Lo que **NO** se publica (queda solo en la red interna, como debe ser):
   publicas, ponle su propia protección; por ahora déjalo fuera del túnel.
 - El **bot de Telegram** no necesita URL pública: usa long-polling saliente.
 
-Necesitas un **dominio** gestionado en Cloudflare (puede ser uno que ya tengas;
-si no, registra uno y muévele los DNS a Cloudflare — es gratis para este uso).
+Para producción estable necesitas un **dominio** gestionado en Cloudflare.
+Si no tienes uno, la sección 1 te explica cómo conseguirlo (y cómo validar
+gratis sin comprar nada todavía).
 
 ---
 
-## 1. Requisitos (una vez) 🧑
+## 1. Conseguir un dominio (o validar sin él) 🧑
+
+Elige según lo que quieras hacer ahora:
+
+### 1.0 ¿Solo quieres VALIDAR hoy, gratis, sin comprar dominio?
+Usa el **túnel rápido** (§A al final): Cloudflare te da una URL pública temporal
+`https://<algo-aleatorio>.trycloudflare.com` sin dominio ni configuración DNS.
+- Sirve para probar en línea el frontend, el login, el dashboard y Telegram.
+- **Limitación:** la URL cambia en cada arranque, así que el OAuth de Gmail
+  (que exige un redirect fijo) es incómodo — habría que reajustarlo cada vez.
+- No es producción estable. Bueno para una demo o prueba puntual; luego compra
+  un dominio para dejarlo permanente.
+
+### 1.1 Comprar el dominio DIRECTO en Cloudflare (recomendado, menos pasos)
+1. Entra a https://dash.cloudflare.com y crea cuenta (gratis).
+2. Menú lateral → **Domain Registration → Register Domain**.
+3. Busca el nombre que quieras (ej. `heliosnavarro.com`), revisa el precio
+   (un `.com` ~10 USD/año; hay extensiones más baratas) y complétalo.
+4. Al comprarlo en Cloudflare, **queda gestionado automáticamente** (no tienes
+   que mover nameservers). En unos minutos aparece como zona "Active".
+
+### 1.2 Ya tengo (o compro en otro registrador) y muevo DNS a Cloudflare
+Si compras en Namecheap, GoDaddy, Squarespace/Google Domains, etc.:
+1. En Cloudflare: **Add a site** → escribe tu dominio → plan **Free**.
+2. Cloudflare te da **2 nameservers** (ej. `xxx.ns.cloudflare.com`).
+3. En tu registrador, reemplaza los nameservers por esos dos.
+4. Espera a que Cloudflare marque la zona como **Active** (minutos a horas).
+
+> Consejo de nombres: usarás dos subdominios, p. ej. `helios.tudominio.com`
+> (interfaz) y `api.helios.tudominio.com` (API). No necesitas comprarlos aparte;
+> los subdominios son gratis una vez tienes el dominio raíz.
+
+---
+
+## 1bis. Requisitos (una vez) 🧑
 
 1. Cuenta en **Cloudflare** (gratis): https://dash.cloudflare.com
-2. Un **dominio** añadido a Cloudflare (Zona activa, nameservers apuntando a
-   Cloudflare). Verás el dominio en el dashboard con estado "Active".
+2. Un **dominio** en Cloudflare con estado "Active" (sección 1). *Salta este
+   punto si vas a usar el túnel rápido §A.*
 3. **Docker Desktop** corriendo (ya lo tienes).
-4. HELIOS levantado en local y sano:
+4. `cloudflared` instalado (sección 2) — **ya instalado: v2026.9.1**.
+5. HELIOS levantado en local y sano:
    ```powershell
    docker compose ps
    # backend, frontend, mysql, bot => healthy / up
@@ -390,4 +426,60 @@ cloudflared tunnel info helios
      de Windows). ← lo que usamos.
    - **8B (Docker):** `docker compose up -d cloudflared`.
 8. Corre la checklist §9.
+
+---
+
+## Anexo A — Validar HOY sin dominio (túnel rápido, gratis)
+
+Para probar en línea antes de comprar un dominio. Te da una URL pública temporal
+`https://<aleatorio>.trycloudflare.com`. No requiere cuenta, dominio ni DNS.
+
+> Recuerda: la URL **cambia en cada arranque**. Sirve para validar frontend,
+> login, dashboard y Telegram. Para Gmail (OAuth) habría que reajustar el
+> redirect cada vez — por eso esto es para pruebas, no para uso diario.
+
+### A.1 Un túnel rápido al frontend (lo más simple)
+En una terminal nueva, con HELIOS ya levantado en local:
+```powershell
+cloudflared tunnel --url http://localhost:5173
 ```
+Copia la URL `https://...trycloudflare.com` que imprime y ábrela en el navegador.
+El frontend cargará, PERO por defecto seguirá llamando al API en `localhost:8000`
+(que solo existe en tu máquina). Para una prueba desde **tu mismo equipo** eso
+funciona; desde **otro dispositivo** necesitas exponer también el API (A.2).
+
+### A.2 Validar el flujo completo desde cualquier dispositivo
+Necesitas exponer frontend y API, y reconstruir el frontend apuntando a la URL
+pública del API:
+
+1. Abre **dos** túneles rápidos (dos terminales):
+   ```powershell
+   # Terminal 1 — API
+   cloudflared tunnel --url http://localhost:8000
+   # Terminal 2 — Frontend
+   cloudflared tunnel --url http://localhost:5173
+   ```
+   Anota las dos URLs `trycloudflare.com` (una para API, otra para frontend).
+
+2. En `.env`, pon esas URLs (temporales) y modo prod:
+   ```dotenv
+   APP_ENV=prod
+   PUBLIC_BASE_URL=https://<api-aleatorio>.trycloudflare.com
+   CORS_ORIGINS=https://<frontend-aleatorio>.trycloudflare.com
+   VITE_API_BASE_URL=https://<api-aleatorio>.trycloudflare.com
+   ```
+
+3. Reconstruye y relevanta (el frontend hornea la URL del API):
+   ```powershell
+   docker compose up -d --build
+   ```
+
+4. (Solo si vas a probar Gmail) añade en Google Cloud el redirect
+   `https://<api-aleatorio>.trycloudflare.com/api/v1/connections/gmail/callback`.
+   Como la URL cambia al reiniciar el túnel, este paso es el incómodo; para una
+   demo rápida puedes omitir Gmail y validar el resto.
+
+5. Abre la URL pública del **frontend** y corre la checklist §9 (pasos 1–4 y 7).
+
+Cuando termines de validar, cierra los túneles (Ctrl+C). Para dejarlo
+permanente, compra un dominio (sección 1) y usa el flujo principal §3–§9.
