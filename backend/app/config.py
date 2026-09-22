@@ -77,6 +77,13 @@ class Settings(BaseSettings):
     # Rate limit for POST /emails/process (calls per minute).
     process_rate_limit_per_minute: int = Field(default=120, ge=1)
 
+    # Background email poller (auto-process new mail without n8n).
+    # Enabled explicitly so the loop only runs where wanted (e.g. the poller
+    # container). Interval floored to avoid hammering provider APIs.
+    poll_enabled: bool = False
+    poll_interval_seconds: int = Field(default=300, ge=30)
+    poll_max_messages: int = Field(default=25, ge=1, le=500)
+
     @property
     def is_prod(self) -> bool:
         return self.app_env == "prod"

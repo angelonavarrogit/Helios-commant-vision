@@ -123,6 +123,9 @@ def test_activity_newest_first_and_capped(db_session: Session) -> None:
 
 @pytest.fixture(autouse=True)
 def _secrets(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    # Pin local env so the session cookie is not "Secure" over the HTTP
+    # TestClient (an ambient APP_ENV=prod would otherwise break login).
+    monkeypatch.setenv("APP_ENV", "local")
     monkeypatch.setenv("ENCRYPTION_KEY", generate_key())
     monkeypatch.setenv("SESSION_SECRET", "test-secret")
     monkeypatch.setenv("OWNER_USERNAME", "owner")

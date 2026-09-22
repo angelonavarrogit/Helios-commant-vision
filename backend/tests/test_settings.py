@@ -20,6 +20,9 @@ from sqlalchemy.pool import StaticPool
 
 @pytest.fixture(autouse=True)
 def _secrets(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    # Pin local env so the session cookie is not "Secure" (the TestClient uses
+    # HTTP); otherwise an ambient APP_ENV=prod would break the login flow.
+    monkeypatch.setenv("APP_ENV", "local")
     monkeypatch.setenv("ENCRYPTION_KEY", generate_key())
     monkeypatch.setenv("SESSION_SECRET", "test-secret")
     monkeypatch.setenv("OWNER_USERNAME", "owner")

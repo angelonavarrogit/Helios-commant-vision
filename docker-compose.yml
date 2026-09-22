@@ -104,6 +104,46 @@ services:
       - frontnet
     restart: unless-stopped
 
+  poller:
+    build:
+      context: ./backend
+    command: ["python", "-m", "app.poller.run"]
+    env_file: .env
+    # Background loop that lists recent mail per connected account and runs the
+    # HELIOS pipeline on new messages (auto-processing, no n8n needed). Only
+    # active when POLL_ENABLED=true in .env. Healthcheck verifies the process.
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import os,sys
+          def alive():
+              for p in os.listdir('/proc'):
+                  if not p.isdigit():
+                      continue
+                  try:
+                      with open(f'/proc/{p}/cmdline','rb') as fh:
+                          if b'app.poller.run' in fh.read():
+                              return True
+                  except OSError:
+                      pass
+              return False
+          sys.exit(0 if alive() else 1)
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      # backnet: read the DB. frontnet: reach Gmail + Telegram APIs (outbound).
+      - backnet
+      - frontnet
+    restart: unless-stopped
+
   frontend:
     build:
       context: ./frontend

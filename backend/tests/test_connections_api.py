@@ -28,6 +28,9 @@ def owner_client(monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
     Login now resolves the password hash with DB-over-env precedence, so the app
     needs a working DB session even for auth. We override get_db with SQLite.
     """
+    # Pin local env so the session cookie is not "Secure" over the HTTP
+    # TestClient (an ambient APP_ENV=prod would otherwise break login).
+    monkeypatch.setenv("APP_ENV", "local")
     monkeypatch.setenv("SESSION_SECRET", "test-secret")
     monkeypatch.setenv("ENCRYPTION_KEY", generate_key())
     monkeypatch.setenv("OWNER_USERNAME", "owner")
